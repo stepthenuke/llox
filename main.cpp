@@ -151,6 +151,10 @@ public:
       return StringRef(Ptr, Length);
    }
 
+   StringRef getTokenText() const {
+      return StringRef(Ptr, Length);
+   }
+
 public:
    bool is(tok::TokenKind K) const {
       return K == Kind;
@@ -377,7 +381,8 @@ public:
       DK_Var,
       DK_Func,
       DK_Param,
-      DK_Type
+      DK_GlobalType,
+      DK_TypeEnd
    };
 
 private:
@@ -494,11 +499,28 @@ public:
 };
 
 class TypeDecl : public Decl {
+protected:
+   TypeDecl(DeclKind Kind, Decl *EnclosingDecl, SMLoc Loc, StringRef Name)
+      : Decl(Kind, EnclosingDecl, Loc, Name) {}
+
 public:
    static bool classof(const Decl *D) {
-      return D->getKind() == DK_Type;
+      return D->getKind() >= DK_GlobalType &&
+             D->getKind() <= DK_TypeEnd;
    }
 };
+
+class GlobalTypeDecl : public TypeDecl {
+public:
+   GlobalTypeDecl(Delc *EnclosingDecl, SMLoc Loc, StringRef Name)
+      : TypeDecl(DK_GlobalType, EnclosingDecl, Loc, Name) {}
+
+public:
+   static bool classof(const Decl *D) {
+      return D->getKind() == DK_GlobalType;
+   }
+}
+
 
 class OperatorInfo {
    SMLoc Loc;
@@ -805,9 +827,57 @@ public:
       if (Res != Table.end())
          return Res->second;
 
-      llvm_unreachable("No such operator");
       return Prec_None; 
    }
+};
+
+class Scope {
+   Scope *Parent;
+   StringMap<Decl*> Symbols;
+
+public:
+   Scope(Scope *Parent = nullptr)
+      : Parent(Parent) {}
+
+   Scope *getParent() {
+      return Parent;
+   }
+
+   bool insert(Decl *Declaration) {
+      return Symbols.insert(std::make_pair(Declaration->getName(), Declaration)).second;
+   }
+
+   Decl *lookup(StringRef Name) {
+      Scope *S = T
+      while (S) {
+         const auto I = S->Symbols.find(Name);
+         if (I != S->Symbols.end())
+            return I->second;
+         S = S->getParent();
+      }
+   }
+};
+
+class Sema {
+   Scope *CurScope;
+   Decl *CurDecl;
+
+   TypeDecl *DoubleType;
+   TypeDecl *BoolType;
+   BoolLiteral *TrueLiteral;
+   BoolLiteral *FalseLiteral;
+   
+public:
+   Sema()
+      : CurScope(new Scope()), CurDecl(nullptr) {
+      DoubleType = new GlobalTypeDecl(CurDecl, SMLoc(), "double");
+      BoolType = new GlobalTypeDecl(CurDecl, SMLoc(), "bool");
+      TrueLiteral = new BoolLiteral(true, BoolType);
+      FalseLiteral = new BoolLiteral(false, BoolType);
+      CurScope->insert(DoubleType);
+      CurScope->insert(BoolType);
+   }
+
 };
 
 class Parser {
@@ -815,6 +885,7 @@ class Parser {
    Lexer &Lex;
 
    OperatorPrecTable &OpPrec;
+   using Precedence = OperatorPrecTable::OperatorPrecedence;
 
    Parser(Lexer &L)
       : Lex(L) {}
@@ -848,6 +919,11 @@ private:
       return !CurTok.isOneOf(std::move(Kinds));
    }
 
+   Precedence getOperatorPrec() {
+      StringRef OpName = CurTok.getTokenText();
+      return OpPrec.getPrecedence(OpName);
+   }
+
    bool parseProgram();
    bool parseDecl();
    bool parseVariableDecl();
@@ -857,15 +933,14 @@ private:
    // primary        → "true" | "false" | {"nil"} | "this"
    //             | NUMBER | STRING | IDENTIFIER | "(" expression ")"
    //             {| "super" "." IDENTIFIER} ;
-   bool parsePrimary(Expr &E) {
+   bool parsePrimary(Expr *&E) {
       switch (CurTok) {
       case tok::kw_true:
-         // TODO: set type
-         E = BoolLiteral(true, nullptr);
-         return true;
+         E = new BoolLiteral(true, nullptr);
+         return false;
       case tok::kw_false:
-         E = BoolLiteral(false, nullptr);
-         return true;
+         E = new BoolLiteral(false, nullptr);
+         return false;
       case tok::identifier:
          return parseIdentifierExpr(E);
       case tok::double_literal:
@@ -880,23 +955,74 @@ private:
       return false;
    } 
 
-   bool parseIdentifier(Expr &E) {
-      // # TODO
+   bool parseIdentifier(Expr *&E) {
+      // TODO
       // if "(" -> call function
       // else take value from identifier
       // also this can be a kw -> error or what?
       return true;
    }
 
-   bool parseNumberExpr(Expr &E) {
+   bool parseNumberExpr(Expr *&E) {
+      if (CurTok.is(tok::double_literal)) {
+         // E = Sem.actOnDoubleLiteral(CurTok.getLocation(), CurTok.getLiteral());
+         StringRef Lit = CurTok.getTokenText();
+         llvm::APFloat Value (std::stod(Lit.data(), Lit.size()));
+         E = new DoubleLiteral(CurTok.getLocation(), Value, nullptr);
+         nextToken();
+      }
+      return false;
+   }
+
+   bool parseStringExpr(Expr *&E) {
+      // TODO
+      if (CurTok.is(tok::string_literal)) {
+         // E = Sem.actOnStringLiteral(); // #TODO
+         nextToken();
+      }
       return true;
+   }
+
+   bool parseParenExpr(Expr *&E) {
+      consumeToken(tok::l_paren);
+      if (parseExpression(E))
+         return true;
+      consumeToken(tok::r_paren);
+      return false;
    }
 
    bool parseExpression(Expr *&E) {
-      return true;
+      if (parsePrimary(E))
+         return true;
+   
+      return false;
    }
 
- 
+   bool parseInfixExpr(Precedence LeftPrec, Expr *&Left) {
+      while (true) {
+         Precedence TokPrec = getOperatorPrec();
+         if (TokPrec < LeftPrec)
+            return false;
+
+         Token BinOp = CurTok;
+         nextToken();
+
+         // if we're here -> we have binop that needs to be parsed
+         Expr *Right = nullptr;
+         if (parsePrimary(Right))
+            return true;
+
+         Precedence RightPrec = getOperatorPrec();
+         if (LeftPrec < RightPrec) {
+            if (parseInfixExpr(LeftPrec + 1, Right))
+               return true;
+         }
+         
+         OperatorInfo OpInfo (BinOp.getLocation(), BinOp.getKind());
+         Left = new InfixExpr(Left, Right, OpInfo, nullptr);
+      }
+   }
+   
 };
 
 

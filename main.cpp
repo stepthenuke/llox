@@ -4,6 +4,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
@@ -367,7 +368,7 @@ using Identifier = std::pair<SMLoc, StringRef>;
 using DeclList = std::vector<Decl*>;
 using StmtList = std::vector<Stmt*>;
 using ExprList = std::vector<Expr*>;
-using ParameterList = std::vector<ParamDecl*>;
+using ParameterList = std::vector<ParameterDecl*>;
 using IdentList = std::vector<Identifier>;
 
 class Decl {
@@ -375,8 +376,9 @@ public:
    enum DeclKind {
       DK_Var,
       DK_Func,
-      DK_Param
-   }
+      DK_Param,
+      DK_Type
+   };
 
 private:
    const DeclKind Kind;
@@ -394,7 +396,7 @@ public:
       return Kind;
    }
 
-   SMLoc getLocation const {
+   SMLoc getLocation() const {
       return Loc;
    }
 
@@ -402,7 +404,7 @@ public:
       return Name;
    }
 
-   Decl *getEnclosingDecl const {
+   Decl *getEnclosingDecl() const {
       return EnclosingDecl;
    }
 };
@@ -430,7 +432,7 @@ class ParameterDecl : public Decl {
 
 public:
    ParameterDecl(Decl *EnclosingDecl, SMLoc Loc, StringRef Name, TypeDecl *Ty, bool IsVar)
-      : Decl(DK_Para, EnclosingDecl, Loc, Name), Ty(Ty), IsVar(IsVar) {}
+      : Decl(DK_Param, EnclosingDecl, Loc, Name), Ty(Ty), IsVar(IsVar) {}
    
    bool isVar() const {
       return IsVar;
@@ -449,10 +451,10 @@ class FunctionDecl : public Decl {
    StmtList Stmts;
 
 public:
-   FunctionFecl(Decl *EnclosingDecl, SMLoc Loc, StringRef Name)
+   FunctionDecl(Decl *EnclosingDecl, SMLoc Loc, StringRef Name)
       : Decl(DK_Func, EnclosingDecl, Loc, Name) {}
 
-   FunctionDecl(Decl *EnclosingDecl, SMLoc Loc, StringRef Name, ParamList &Params
+   FunctionDecl(Decl *EnclosingDecl, SMLoc Loc, StringRef Name, ParameterList &Params,
       TypeDecl *RetType, DeclList &Decls, StmtList &Stmts) 
       : Decl(DK_Func, EnclosingDecl, Loc, Name),
         Params(Params), RetType(RetType), Decls(Decls), Stmts(Stmts) {}
@@ -489,6 +491,39 @@ public:
    static bool classof(const Decl *D) {
       return D->getKind() == DK_Func;
    }
+};
+
+class TypeDecl : public Decl {
+public:
+   static bool classof(const Decl *D) {
+      return D->getKind() == DK_Type;
+   }
+};
+
+class OperatorInfo {
+   SMLoc Loc;
+   uint32_t Kind : 16;
+   uint32_t IsUnspecified : 1;
+
+public:
+   OperatorInfo()
+      : Loc(), Kind(tok::unknown), IsUnspecified(true) {}
+
+   OperatorInfo(SMLoc Loc, tok::TokenKind Kind, bool IsUnspecified = false)
+      : Loc(Loc), Kind(Kind), IsUnspecified(IsUnspecified) {}
+   
+   SMLoc getLocation() const {
+      return Loc;
+   }
+
+   tok::TokenKind getKind() const {
+      return static_cast<tok::TokenKind>(Kind);
+   }
+
+   bool isUnspecified() const {
+      return IsUnspecified;
+   }
+   
 };
 
 class Expr {
@@ -528,10 +563,10 @@ class DoubleLiteral : public Expr {
    llvm::APFloat Value;
 
 public:
-   DoubleLiteral(SMLoc Loc, const llvm::APSFloat &Value, TypeDecl *Ty)
-      : Expr(EK_Int, Ty), Loc(Loc), Value(Value) {}
+   DoubleLiteral(SMLoc Loc, const llvm::APFloat &Value, TypeDecl *Ty)
+      : Expr(EK_Double, Ty), Loc(Loc), Value(Value) {}
    
-   llvm::APFLoat &getValue {
+   llvm::APFloat &getValue() {
       return Value;
    }
 
@@ -546,9 +581,9 @@ class BoolLiteral : public Expr {
 
 public:
    BoolLiteral(bool Value, TypeDecl *Ty)
-      : Expr(EK_Int, Ty), Value(Value) {}
+      : Expr(EK_Bool, Ty), Value(Value) {}
    
-   bool getValue {
+   bool getValue() {
       return Value;
    }
 
@@ -593,7 +628,7 @@ public:
    PrefixExpr(Expr *E, OperatorInfo Op, TypeDecl *Ty)
       : Expr(EK_Prefix, Ty), E(E), Op(Op) {}
 
-   Expr *getExpr const {
+   Expr *getExpr() const {
       return E;
    }
 
@@ -615,7 +650,7 @@ public:
    FunctionCallExpr(FunctionDecl *Func, ExprList Params)
       : Expr(EK_Func, Func->getRetType()), Func(Func), Params(Params) {}
 
-   FunctionDecl *getDecl {
+   FunctionDecl *getDecl() {
       return Func;
    }
 
@@ -635,7 +670,7 @@ public:
       SK_If,
       SK_While,
       SK_Return
-   }
+   };
 
 private:
    const StmtKind Kind;
@@ -657,7 +692,7 @@ class IfStmt : public Stmt {
 
 public:
    IfStmt(Expr *Cond, StmtList &IfStmts, StmtList &ElseStmts)
-      : Stmt(SK_If), Cond(Cond), IfStmt(IfStmts), ElseStmts(ElseStmts) {}
+      : Stmt(SK_If), Cond(Cond), IfStmts(IfStmts), ElseStmts(ElseStmts) {}
 
    Expr *getCond() {
       return Cond;
@@ -683,7 +718,7 @@ class WhileStmt : public Stmt {
 
 public:
    WhileStmt(Expr *Cond, StmtList &Stmts)
-      : Stmts(SK_While), Cond(Cond), Stmts(Stmts) {}
+      : Stmt(SK_While), Cond(Cond), Stmts(Stmts) {}
 
    Expr *getCond() {
       return Cond;
@@ -716,9 +751,70 @@ public:
    } 
 };
 
+class OperatorPrecTable {
+   enum OperatorPrecedence {
+      Prec_None,
+      Prec_Assignment,
+      Prec_Or,
+      Prec_And,
+      Prec_Equality,
+      Prec_Comparison,
+      Prec_Term,
+      Prec_Factor,
+      Prec_Unary,
+      Prec_Call,
+      Prec_Primary
+      // PREC_NONE,
+      // PREC_ASSIGNMENT,  // =
+      // PREC_OR,          // or
+      // PREC_AND,         // and
+      // PREC_EQUALITY,    // == !=
+      // PREC_COMPARISON,  // < > <= >=
+      // PREC_TERM,        // + -
+      // PREC_FACTOR,      // * /
+      // PREC_UNARY,       // ! -
+      // PREC_CALL,        // . ()
+      // PREC_PRIMARY
+   };
+
+   llvm::StringMap<OperatorPrecedence> Table;
+   // fill the map somewhere and use it
+
+public:
+   OperatorPrecTable() {
+      Table.insert(std::make_pair("=", Prec_Assignment));
+      Table.insert(std::make_pair("or", Prec_Or));
+      Table.insert(std::make_pair("and", Prec_And));
+      Table.insert(std::make_pair("==", Prec_Equality));
+      Table.insert(std::make_pair("!=", Prec_Equality));
+      Table.insert(std::make_pair("<", Prec_Comparison));
+      Table.insert(std::make_pair("<=", Prec_Comparison));
+      Table.insert(std::make_pair(">", Prec_Comparison));
+      Table.insert(std::make_pair(">=", Prec_Comparison));
+      Table.insert(std::make_pair("+", Prec_Term));
+      Table.insert(std::make_pair("-", Prec_Term));
+      Table.insert(std::make_pair("*", Prec_Factor));
+      Table.insert(std::make_pair("/", Prec_Factor));
+      Table.insert(std::make_pair("!", Prec_Unary));
+      Table.insert(std::make_pair("-", Prec_Unary));
+      Table.insert(std::make_pair(".", Prec_Call));
+   }
+
+   OperatorPrecedence getPrecedence(StringRef OpName) {
+      auto Res = Table.find(OpName);
+      if (Res != Table.end())
+         return Res->second;
+
+      llvm_unreachable("No such operator");
+      return Prec_None; 
+   }
+};
+
 class Parser {
    Token CurTok;
    Lexer &Lex;
+
+   OperatorPrecTable &OpPrec;
 
    Parser(Lexer &L)
       : Lex(L) {}
@@ -728,23 +824,79 @@ private:
       Lex.getNextToken(CurTok);
    }
 
-   bool expectToken(tok::TokenKind Kind) {
-      nextToken();
-      return CurTok.is(Kind);
+   bool consumeToken(tok::TokenKind Kind) {
+      if (CurTok.is(Kind)) {
+         nextToken();
+         return false;
+      }
+      return true;
    }
 
-   bool expectToken(std::initializer_list<tok::TokenKind> &&Kinds) {
-      nextToken();
-      return CurTok.isOneOf(std::move(Kinds));
+   bool consumeToken(std::initializer_list<tok::TokenKind> &&Kinds) {
+      if (CurTok.isOneOf(std::move(Kinds))) {
+         nextToken();
+         return false;
+      }
+      return true;
    }
 
    bool checkToken(tok::TokenKind Kind) {
-      return CurTok.is(Kind);
+      return !CurTok.is(Kind);
+   }
+
+   bool checkToken(std::initializer_list<tok::TokenKind> &&Kinds) {
+      return !CurTok.isOneOf(std::move(Kinds));
    }
 
    bool parseProgram();
-   bool parseDeclaration();
-   bool parseVariableDeclaration();
+   bool parseDecl();
+   bool parseVariableDecl();
+   bool parseFunctionDecl();
+   bool parseParameterDecl();
+
+   // primary        → "true" | "false" | {"nil"} | "this"
+   //             | NUMBER | STRING | IDENTIFIER | "(" expression ")"
+   //             {| "super" "." IDENTIFIER} ;
+   bool parsePrimary(Expr &E) {
+      switch (CurTok) {
+      case tok::kw_true:
+         // TODO: set type
+         E = BoolLiteral(true, nullptr);
+         return true;
+      case tok::kw_false:
+         E = BoolLiteral(false, nullptr);
+         return true;
+      case tok::identifier:
+         return parseIdentifierExpr(E);
+      case tok::double_literal:
+         return parseNumberExpr(E);
+      case tok::string_literal:
+         return parseStringExpr(E);
+      case tok::l_paren:
+         return parseParenExpr(E);
+      default:
+         break;
+      }
+      return false;
+   } 
+
+   bool parseIdentifier(Expr &E) {
+      // # TODO
+      // if "(" -> call function
+      // else take value from identifier
+      // also this can be a kw -> error or what?
+      return true;
+   }
+
+   bool parseNumberExpr(Expr &E) {
+      return true;
+   }
+
+   bool parseExpression(Expr *&E) {
+      return true;
+   }
+
+ 
 };
 
 

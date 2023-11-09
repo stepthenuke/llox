@@ -18,6 +18,9 @@
 using llvm::SourceMgr;
 using llvm::SMLoc;
 using llvm::StringRef;
+using llvm::cast;
+using llvm::isa;
+using llvm::dyn_cast;
 
 namespace charinfo {
 
@@ -906,10 +909,6 @@ public:
          llvm_unreachable("incompatible types");
 
       TypeDecl *Ty = Left->getType();
-      std::cout << "INFEXPR YEEE\n";
-
-      assert(llvm::isa<DoubleLiteral>(Left) && llvm::isa<DoubleLiteral>(Right));
-      std::cout << Op.getKind() << std::endl;
       return new InfixExpr(Left, Right, Op, Ty);
    }
 
@@ -957,47 +956,36 @@ public:
       return !CurTok.isOneOf(std::move(Kinds));
    }
 
+   OperatorPrec getBinOperatorPrec() {
+      return op::getBinaryPrec(CurTok.getKind());
+   } 
+
+   OperatorPrec getUnOperatorPrec() {
+      return op::getUnaryPrec(CurTok.getKind());
+   }
+
    bool parseProgram();
    bool parseDecl();
    bool parseVariableDecl();
    bool parseFunctionDecl();
    bool parseParameterDecl();
 
-   // primary        → "true" | "false" | {"nil"} | "this"
-   //             | NUMBER | STRING | IDENTIFIER | "(" expression ")"
-   //             {| "super" "." IDENTIFIER} ;
-   bool parsePrimary(Expr *&E) {
-      std::cout << "PRIMARY " << std::endl;
-      llvm::outs() << CurTok.getTokenText() << "\n";
-      switch (CurTok.getKind()) {
-      case tok::kw_true:
-      case tok::kw_false:
-         // TODO what on bool ?
-         return true;
-      case tok::identifier:
-         return parseIdentifierExpr(E);
-      case tok::double_literal:
-         return parseNumberExpr(E);
-      case tok::string_literal:
-         return parseStringExpr(E);
-      case tok::l_paren:
-         return parseParenExpr(E);
-      default:
-         break;
-      }
-      return false;
-   } 
-
    bool parseIdentifierExpr(Expr *&E) {
-      // TODO
-      // if "(" -> call function
-      // else take value from identifier
-      // also this can be a kw -> error or what?
+      return true;
+   }
+   bool parseStringLiteral(Expr *&E) {
       return true;
    }
 
-   bool parseNumberExpr(Expr *&E) {
-      std::cout << "NUMBEREXPR\n";
+   bool parseParenExpr(Expr *&E) {
+      consumeToken(tok::l_paren);
+      if (parseExpr(E))
+         return true;
+      consumeToken(tok::r_paren);
+      return false;
+   }
+
+   bool parseDoubleLiteral(Expr *&E) {
       if (CurTok.is(tok::double_literal)) {
          E = Sem.actOnDoubleLiteral(CurTok.getLocation(), CurTok.getLiteral());
          nextToken();
@@ -1006,91 +994,92 @@ public:
       return true;
    }
 
-   bool parseStringExpr(Expr *&E) {
-      // TODO
-      if (CurTok.is(tok::string_literal)) {
-         // E = Sem.actOnStringLiteral(); // #TODO
-         nextToken();
+   bool parsePrimary(Expr *&E) {
+      switch (CurTok.getKind()) {
+      case tok::kw_false:
+      case tok::kw_true:
+         return true; // TODO: do smth on false and true
+      case tok::identifier:
+         return parseIdentifierExpr(E);
+      case tok::double_literal:
+         return parseDoubleLiteral(E);
+      case tok::string_literal:
+         return parseStringLiteral(E);
+      case tok::l_paren:
+         return parseParenExpr(E);
+      default:
+         return false;
       }
-      return true;
    }
 
-   bool parseParenExpr(Expr *&E) {
-      if (consumeToken(tok::l_paren))
-         return true;
-      if (parseExpression(E))
-         return true;
-      if (consumeToken(tok::r_paren))
-         return true;
-      return false;
-   }
-
-   bool parseExpression(Expr *&E) {
-      std::cout << "EXPR" << std::endl;
-      if (parsePrimary(E)) {
-         return true;
-      }
-      // if E is nullptr -> no any exprs more -> leave
+   bool parseExpr(Expr *&E) {
+      parsePrimary(E);
       if (!E)
          return false;
-      
+
       return parseInfixExpr(op::Prec_None, E);
    }
-
-// Pratt parser
+   
    bool parseInfixExpr(OperatorPrec LeftPrec, Expr *&Left) {
-      std::cout << "INFIX" << std::endl;
       while (true) {
-         llvm::outs() << "CURTOK IS " << CurTok.getTokenText() << "\n";
-         OperatorPrec TokPrec = op::getBinaryPrec(CurTok.getKind());
-         // this is situation like  a * b + c
-         // LeftPrec = prec(*) > prec(+) = prec(+)
-         if (TokPrec < LeftPrec)
-            return false;
-
-         std::cout << "HERE1" << std::endl; 
-
-         llvm::outs() << CurTok.getTokenText() << "\n";
-         // else it's: lhs binop rhs
-         OperatorInfo BinOp (CurTok.getLocation(), CurTok.getKind());
-         nextToken();
-
-         Expr *Right = nullptr;
-         parsePrimary(Right);
-         if (!Right)
+         OperatorInfo BinOp(CurTok.getLocation(), CurTok.getKind());
+         OperatorPrec BinOpPrec = BinOp.getBinPrec();
+         
+         // a * b + c
+         //       |
+         // prec(*) > prec(+) -> stop because (a * b) is expr
+         // then (a * b) goes upper and we have InfixExpr:
+         // + -> (a*b)
+         // | -> c
+         if (BinOpPrec < LeftPrec)
             return false;
          
-         std::cout << "HERE2" << std::endl; 
+         nextToken(); // eat BinOp
 
-         // get next prec 
+         // if we're here -> we need to parse
+         Expr *Right = nullptr;
+         if (parsePrimary(Right))
+            return true;
+         if (!Right)
+            return false;
 
-         // llvm::outs() << "CURTOK IS " << CurTok.getTokenText() << "\n";
-         OperatorPrec NextPrec = op::getBinaryPrec(CurTok.getKind());
-
-         std::cout << "TOKPREC " << TokPrec << std::endl;
-         std::cout << "NEXTPREC " << NextPrec << std::endl;
-         // situation:
-         // lhs + rhs * c -> rhs become lhs of * -> then we take result and
-         // use it as lhs of +
-         if (TokPrec < NextPrec) {
-            std::cout << "WTF" << std::endl;
-            OperatorPrec NextPrec = (static_cast<OperatorPrec>(TokPrec + 1)  < op::Prec_Primary) ? 
-               static_cast<OperatorPrec>(TokPrec + 1) : op::Prec_Primary; 
-            parseInfixExpr(NextPrec, Right);
+         // we can have situation like
+         // ... a + b * c
+         //         |
+         // BinOp is +
+         // Right is b
+         // we need to find prec of *
+         // prec(+) < prec(*) -> b is lhs of *
+         OperatorPrec NextBinOpPrec = op::getBinaryPrec(CurTok.getKind());
+         if (NextBinOpPrec > BinOpPrec) {
+            OperatorPrec NewPrec = (op::Prec_Primary < static_cast<OperatorPrec>(BinOpPrec + 1)) 
+                                   ? op::Prec_Primary : static_cast<OperatorPrec>(BinOpPrec + 1);
+            if (parseInfixExpr(NewPrec, Right))
+               return true;
             if (!Right)
                return false;
          }
-         else {
-            Left = Sem.actOnInfixExpr(Left, Right, BinOp);
-            return false;
-         }
-
-         // merge lhs + rhs
+         Left = Sem.actOnInfixExpr(Left, Right, BinOp);
       }
    }
    
 };
 
+static void printInfixAST(Expr *E) {
+   if (!E) return;
+
+   if (auto *I = dyn_cast<InfixExpr>(E)) {
+      llvm::outs() << " ( " << tok::getTokenName(I->getOperatorInfo().getKind());
+      printInfixAST(I->getLeft());
+      printInfixAST(I->getRight());
+      llvm::outs() << " ) ";
+   }
+   else if (auto *D = dyn_cast<DoubleLiteral>(E)) {
+      llvm::SmallVector<char, 16> Buffer;
+      D->getValue().toString(Buffer);
+      llvm::outs() << " d:" << Buffer << ",";
+   }
+}
 
 int main(int argc_, char **argv_) {
 
@@ -1127,8 +1116,8 @@ int main(int argc_, char **argv_) {
       // }
 
       Expr *E = nullptr;
-      std::cout << Par.parseExpression(E) << "\n";
-      std::cout << "It's " << llvm::isa<InfixExpr>(E);
+      std::cout << Par.parseExpr(E) << "\n";
+      printInfixAST(E);
    }
 
    return 0;

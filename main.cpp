@@ -147,7 +147,7 @@ public:
    }
 
    StringRef getLiteral() const {
-      assert(is(tok::double_literal) && "not literal");
+      assert(isOneOf({tok::double_literal, tok::string_literal}) && "not literal");
       return StringRef(Ptr, Length);
    }
 
@@ -512,27 +512,74 @@ public:
 
 class GlobalTypeDecl : public TypeDecl {
 public:
-   GlobalTypeDecl(Delc *EnclosingDecl, SMLoc Loc, StringRef Name)
+   GlobalTypeDecl(Decl *EnclosingDecl, SMLoc Loc, StringRef Name)
       : TypeDecl(DK_GlobalType, EnclosingDecl, Loc, Name) {}
 
 public:
    static bool classof(const Decl *D) {
       return D->getKind() == DK_GlobalType;
    }
+};
+
+namespace op {
+
+enum OperatorPrec {
+   Prec_None,
+   Prec_Assignment,
+   Prec_Or,
+   Prec_And,
+   Prec_Equality,
+   Prec_Comparison,
+   Prec_Term,
+   Prec_Factor,
+   Prec_Unary,
+   Prec_Call,
+   Prec_Primary
+};
+
+OperatorPrec getUnaryPrec(tok::TokenKind K) {
+   switch (K) {
+// // -------------------------------------------------------------
+#define UNARY_OPERATOR(ID, SP, PR) case (tok::ID): return PR;
+#include "UnaryOperators.def"
+// // -------------------------------------------------------------
+   default: return Prec_None;
+   }
+};
+
+OperatorPrec getBinaryPrec(tok::TokenKind K) {
+   switch (K) {
+// -------------------------------------------------------------
+#define BINARY_OPERATOR(ID, SP, PR) case (tok::ID): return PR;
+#include "BinaryOperators.def"
+// -------------------------------------------------------------
+   default: return Prec_None;
+   }
+};
+
+inline bool isUnaryOp(tok::TokenKind K) {
+   return getUnaryPrec(K) != Prec_None;
 }
 
+inline bool isBinaryOp(tok::TokenKind K) {
+   return getBinaryPrec(K) != Prec_None;
+}
+
+}; // namespace op
 
 class OperatorInfo {
    SMLoc Loc;
-   uint32_t Kind : 16;
+   uint32_t Kind : 8;
+   uint32_t BinPrec : 8;
+   uint32_t UnPrec : 8;
    uint32_t IsUnspecified : 1;
 
 public:
    OperatorInfo()
-      : Loc(), Kind(tok::unknown), IsUnspecified(true) {}
+      : Loc(), Kind(tok::unknown), BinPrec(op::Prec_None), UnPrec(op::Prec_None), IsUnspecified(true) {}
 
    OperatorInfo(SMLoc Loc, tok::TokenKind Kind, bool IsUnspecified = false)
-      : Loc(Loc), Kind(Kind), IsUnspecified(IsUnspecified) {}
+      : Loc(Loc), Kind(Kind), BinPrec(op::getBinaryPrec(Kind)), UnPrec(op::getUnaryPrec(Kind)), IsUnspecified(IsUnspecified) {}
    
    SMLoc getLocation() const {
       return Loc;
@@ -542,10 +589,17 @@ public:
       return static_cast<tok::TokenKind>(Kind);
    }
 
+   op::OperatorPrec getUnPrec() const {
+      return static_cast<op::OperatorPrec>(UnPrec);
+   }
+
+   op::OperatorPrec getBinPrec() const {
+      return static_cast<op::OperatorPrec>(BinPrec);
+   }
+
    bool isUnspecified() const {
       return IsUnspecified;
-   }
-   
+   } 
 };
 
 class Expr {
@@ -773,67 +827,9 @@ public:
    } 
 };
 
-class OperatorPrecTable {
-   enum OperatorPrecedence {
-      Prec_None,
-      Prec_Assignment,
-      Prec_Or,
-      Prec_And,
-      Prec_Equality,
-      Prec_Comparison,
-      Prec_Term,
-      Prec_Factor,
-      Prec_Unary,
-      Prec_Call,
-      Prec_Primary
-      // PREC_NONE,
-      // PREC_ASSIGNMENT,  // =
-      // PREC_OR,          // or
-      // PREC_AND,         // and
-      // PREC_EQUALITY,    // == !=
-      // PREC_COMPARISON,  // < > <= >=
-      // PREC_TERM,        // + -
-      // PREC_FACTOR,      // * /
-      // PREC_UNARY,       // ! -
-      // PREC_CALL,        // . ()
-      // PREC_PRIMARY
-   };
-
-   llvm::StringMap<OperatorPrecedence> Table;
-   // fill the map somewhere and use it
-
-public:
-   OperatorPrecTable() {
-      Table.insert(std::make_pair("=", Prec_Assignment));
-      Table.insert(std::make_pair("or", Prec_Or));
-      Table.insert(std::make_pair("and", Prec_And));
-      Table.insert(std::make_pair("==", Prec_Equality));
-      Table.insert(std::make_pair("!=", Prec_Equality));
-      Table.insert(std::make_pair("<", Prec_Comparison));
-      Table.insert(std::make_pair("<=", Prec_Comparison));
-      Table.insert(std::make_pair(">", Prec_Comparison));
-      Table.insert(std::make_pair(">=", Prec_Comparison));
-      Table.insert(std::make_pair("+", Prec_Term));
-      Table.insert(std::make_pair("-", Prec_Term));
-      Table.insert(std::make_pair("*", Prec_Factor));
-      Table.insert(std::make_pair("/", Prec_Factor));
-      Table.insert(std::make_pair("!", Prec_Unary));
-      Table.insert(std::make_pair("-", Prec_Unary));
-      Table.insert(std::make_pair(".", Prec_Call));
-   }
-
-   OperatorPrecedence getPrecedence(StringRef OpName) {
-      auto Res = Table.find(OpName);
-      if (Res != Table.end())
-         return Res->second;
-
-      return Prec_None; 
-   }
-};
-
 class Scope {
    Scope *Parent;
-   StringMap<Decl*> Symbols;
+   llvm::StringMap<Decl*> Symbols;
 
 public:
    Scope(Scope *Parent = nullptr)
@@ -848,13 +844,14 @@ public:
    }
 
    Decl *lookup(StringRef Name) {
-      Scope *S = T
+      Scope *S = this;
       while (S) {
          const auto I = S->Symbols.find(Name);
          if (I != S->Symbols.end())
             return I->second;
          S = S->getParent();
       }
+      return nullptr;
    }
 };
 
@@ -866,6 +863,23 @@ class Sema {
    TypeDecl *BoolType;
    BoolLiteral *TrueLiteral;
    BoolLiteral *FalseLiteral;
+
+   bool checkOperatorType(tok::TokenKind OpKind, TypeDecl *Ty) {
+      switch (OpKind) {
+      case tok::plus:
+      case tok::minus:
+      case tok::star:
+      case tok::slash:
+         return Ty == DoubleType;
+      case tok::bang:
+      case tok::kw_and:
+      case tok::kw_or:
+         return Ty == BoolType;
+      default:
+         llvm_unreachable("unknown operator");
+      }
+      return false;
+   }
    
 public:
    Sema()
@@ -878,19 +892,43 @@ public:
       CurScope->insert(BoolType);
    }
 
+   Expr *actOnDoubleLiteral(SMLoc Loc, StringRef Literal) {
+      return new DoubleLiteral(Loc, llvm::APFloat(llvm::APFloat::IEEEdouble(), Literal), DoubleType);
+   }
+   
+   Expr *actOnInfixExpr(Expr *Left, Expr *Right, const OperatorInfo &Op) {
+      if (!Left)
+         return Right;
+      if (!Right)
+         return Left;
+
+      if (Left->getType() != Right->getType())
+         llvm_unreachable("incompatible types");
+
+      TypeDecl *Ty = Left->getType();
+      std::cout << "INFEXPR YEEE\n";
+
+      assert(llvm::isa<DoubleLiteral>(Left) && llvm::isa<DoubleLiteral>(Right));
+      std::cout << Op.getKind() << std::endl;
+      return new InfixExpr(Left, Right, Op, Ty);
+   }
+
 };
 
 class Parser {
    Token CurTok;
    Lexer &Lex;
+   Sema &Sem;
 
-   OperatorPrecTable &OpPrec;
-   using Precedence = OperatorPrecTable::OperatorPrecedence;
+   using OperatorPrec = op::OperatorPrec;
 
-   Parser(Lexer &L)
-      : Lex(L) {}
+public:
+   Parser(Lexer &L, Sema &S)
+      : Lex(L), Sem(S) {
+      nextToken();
+   }
 
-private:
+public:
    void nextToken() {
       Lex.getNextToken(CurTok);
    }
@@ -919,11 +957,6 @@ private:
       return !CurTok.isOneOf(std::move(Kinds));
    }
 
-   Precedence getOperatorPrec() {
-      StringRef OpName = CurTok.getTokenText();
-      return OpPrec.getPrecedence(OpName);
-   }
-
    bool parseProgram();
    bool parseDecl();
    bool parseVariableDecl();
@@ -934,13 +967,13 @@ private:
    //             | NUMBER | STRING | IDENTIFIER | "(" expression ")"
    //             {| "super" "." IDENTIFIER} ;
    bool parsePrimary(Expr *&E) {
-      switch (CurTok) {
+      std::cout << "PRIMARY " << std::endl;
+      llvm::outs() << CurTok.getTokenText() << "\n";
+      switch (CurTok.getKind()) {
       case tok::kw_true:
-         E = new BoolLiteral(true, nullptr);
-         return false;
       case tok::kw_false:
-         E = new BoolLiteral(false, nullptr);
-         return false;
+         // TODO what on bool ?
+         return true;
       case tok::identifier:
          return parseIdentifierExpr(E);
       case tok::double_literal:
@@ -955,7 +988,7 @@ private:
       return false;
    } 
 
-   bool parseIdentifier(Expr *&E) {
+   bool parseIdentifierExpr(Expr *&E) {
       // TODO
       // if "(" -> call function
       // else take value from identifier
@@ -964,14 +997,13 @@ private:
    }
 
    bool parseNumberExpr(Expr *&E) {
+      std::cout << "NUMBEREXPR\n";
       if (CurTok.is(tok::double_literal)) {
-         // E = Sem.actOnDoubleLiteral(CurTok.getLocation(), CurTok.getLiteral());
-         StringRef Lit = CurTok.getTokenText();
-         llvm::APFloat Value (std::stod(Lit.data(), Lit.size()));
-         E = new DoubleLiteral(CurTok.getLocation(), Value, nullptr);
+         E = Sem.actOnDoubleLiteral(CurTok.getLocation(), CurTok.getLiteral());
          nextToken();
+         return false;
       }
-      return false;
+      return true;
    }
 
    bool parseStringExpr(Expr *&E) {
@@ -984,42 +1016,76 @@ private:
    }
 
    bool parseParenExpr(Expr *&E) {
-      consumeToken(tok::l_paren);
+      if (consumeToken(tok::l_paren))
+         return true;
       if (parseExpression(E))
          return true;
-      consumeToken(tok::r_paren);
+      if (consumeToken(tok::r_paren))
+         return true;
       return false;
    }
 
    bool parseExpression(Expr *&E) {
-      if (parsePrimary(E))
+      std::cout << "EXPR" << std::endl;
+      if (parsePrimary(E)) {
          return true;
-   
-      return false;
+      }
+      // if E is nullptr -> no any exprs more -> leave
+      if (!E)
+         return false;
+      
+      return parseInfixExpr(op::Prec_None, E);
    }
 
-   bool parseInfixExpr(Precedence LeftPrec, Expr *&Left) {
+// Pratt parser
+   bool parseInfixExpr(OperatorPrec LeftPrec, Expr *&Left) {
+      std::cout << "INFIX" << std::endl;
       while (true) {
-         Precedence TokPrec = getOperatorPrec();
+         llvm::outs() << "CURTOK IS " << CurTok.getTokenText() << "\n";
+         OperatorPrec TokPrec = op::getBinaryPrec(CurTok.getKind());
+         // this is situation like  a * b + c
+         // LeftPrec = prec(*) > prec(+) = prec(+)
          if (TokPrec < LeftPrec)
             return false;
 
-         Token BinOp = CurTok;
+         std::cout << "HERE1" << std::endl; 
+
+         llvm::outs() << CurTok.getTokenText() << "\n";
+         // else it's: lhs binop rhs
+         OperatorInfo BinOp (CurTok.getLocation(), CurTok.getKind());
          nextToken();
 
-         // if we're here -> we have binop that needs to be parsed
          Expr *Right = nullptr;
-         if (parsePrimary(Right))
-            return true;
-
-         Precedence RightPrec = getOperatorPrec();
-         if (LeftPrec < RightPrec) {
-            if (parseInfixExpr(LeftPrec + 1, Right))
-               return true;
-         }
+         parsePrimary(Right);
+         if (!Right)
+            return false;
          
-         OperatorInfo OpInfo (BinOp.getLocation(), BinOp.getKind());
-         Left = new InfixExpr(Left, Right, OpInfo, nullptr);
+         std::cout << "HERE2" << std::endl; 
+
+         // get next prec 
+
+         // llvm::outs() << "CURTOK IS " << CurTok.getTokenText() << "\n";
+         OperatorPrec NextPrec = op::getBinaryPrec(CurTok.getKind());
+
+         std::cout << "TOKPREC " << TokPrec << std::endl;
+         std::cout << "NEXTPREC " << NextPrec << std::endl;
+         // situation:
+         // lhs + rhs * c -> rhs become lhs of * -> then we take result and
+         // use it as lhs of +
+         if (TokPrec < NextPrec) {
+            std::cout << "WTF" << std::endl;
+            OperatorPrec NextPrec = (static_cast<OperatorPrec>(TokPrec + 1)  < op::Prec_Primary) ? 
+               static_cast<OperatorPrec>(TokPrec + 1) : op::Prec_Primary; 
+            parseInfixExpr(NextPrec, Right);
+            if (!Right)
+               return false;
+         }
+         else {
+            Left = Sem.actOnInfixExpr(Left, Right, BinOp);
+            return false;
+         }
+
+         // merge lhs + rhs
       }
    }
    
@@ -1051,11 +1117,18 @@ int main(int argc_, char **argv_) {
       SrcMgr.AddNewSourceBuffer(std::move(*FileOrErr), llvm::SMLoc());
       auto Lex = Lexer(SrcMgr);
 
-      Token Tok;
-      Tok.setKind(tok::unknown);
-      while (Tok.isNot(tok::eof)) {
-         Lex.getNextToken(Tok);
-      }
+      auto Sem = Sema();
+      auto Par = Parser(Lex, Sem);
+
+      // Token Tok;
+      // Tok.setKind(tok::unknown);
+      // while (Tok.isNot(tok::eof)) {
+      //    Lex.getNextToken(Tok);
+      // }
+
+      Expr *E = nullptr;
+      std::cout << Par.parseExpression(E) << "\n";
+      std::cout << "It's " << llvm::isa<InfixExpr>(E);
    }
 
    return 0;

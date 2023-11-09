@@ -1,0 +1,12 @@
+#ifndef UNARY_OPERATOR
+#define UNARY_OPERATOR(ID, SP, PR) ID
+#endif
+#ifndef KW_OPERATOR
+#define KW_OPERATOR(ID, SP, PR) UNARY_OPERATOR(kw_ ## ID, SP, PR)
+#endif
+
+UNARY_OPERATOR(minus, "-", Prec_Unary)
+UNARY_OPERATOR(bang, "!", Prec_Unary)
+
+#undef KW_OPERATOR
+#undef UNARY_OPERATOR

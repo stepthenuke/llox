@@ -909,9 +909,22 @@ public:
          llvm_unreachable("incompatible types");
 
       TypeDecl *Ty = Left->getType();
+      if (!checkOperatorType(Op.getKind(), Ty))
+         llvm_unreachable("incompatible operator for vals");
+
       return new InfixExpr(Left, Right, Op, Ty);
    }
 
+   Expr *actOnPrefixExpr(Expr *E, const OperatorInfo &Op) {
+      if (!E)
+         return nullptr;
+
+      TypeDecl *Ty = E->getType();
+      if (!checkOperatorType(Op.getKind(), Ty))
+         llvm_unreachable("incompatible operator for val");
+   
+      return new PrefixExpr(E, Op, Ty);
+   }
 };
 
 class Parser {
@@ -971,6 +984,8 @@ public:
    bool parseParameterDecl();
 
    bool parseIdentifierExpr(Expr *&E) {
+      // here we need to take the value from var
+      // or call a function
       return true;
    }
    bool parseStringLiteral(Expr *&E) {
@@ -1013,7 +1028,8 @@ public:
    }
 
    bool parseExpr(Expr *&E) {
-      parsePrimary(E);
+      if (parsePrefixExpr(E))
+         return true;
       if (!E)
          return false;
 
@@ -1025,31 +1041,18 @@ public:
          OperatorInfo BinOp(CurTok.getLocation(), CurTok.getKind());
          OperatorPrec BinOpPrec = BinOp.getBinPrec();
          
-         // a * b + c
-         //       |
-         // prec(*) > prec(+) -> stop because (a * b) is expr
-         // then (a * b) goes upper and we have InfixExpr:
-         // + -> (a*b)
-         // | -> c
          if (BinOpPrec < LeftPrec)
             return false;
          
          nextToken(); // eat BinOp
 
-         // if we're here -> we need to parse
+         // there can be expr: 10 + -1 -> parsing + -> we find unary expr
          Expr *Right = nullptr;
-         if (parsePrimary(Right))
+         if (parsePrefixExpr(Right))
             return true;
          if (!Right)
             return false;
 
-         // we can have situation like
-         // ... a + b * c
-         //         |
-         // BinOp is +
-         // Right is b
-         // we need to find prec of *
-         // prec(+) < prec(*) -> b is lhs of *
          OperatorPrec NextBinOpPrec = op::getBinaryPrec(CurTok.getKind());
          if (NextBinOpPrec > BinOpPrec) {
             OperatorPrec NewPrec = (op::Prec_Primary < static_cast<OperatorPrec>(BinOpPrec + 1)) 
@@ -1062,6 +1065,23 @@ public:
          Left = Sem.actOnInfixExpr(Left, Right, BinOp);
       }
    }
+
+   bool parsePrefixExpr(Expr *&E) {
+      if (!op::isUnaryOp(CurTok.getKind())) {
+         return parsePrimary(E);
+      }
+
+      OperatorInfo UnOp(CurTok.getLocation(), CurTok.getKind());
+      nextToken();
+      Expr *Operand = nullptr;
+      if (parsePrefixExpr(Operand))
+         return true;
+      if (!Operand)
+         return true;
+      
+      E = Sem.actOnPrefixExpr(Operand, UnOp);
+      return false;
+   }
    
 };
 
@@ -1070,14 +1090,24 @@ static void printInfixAST(Expr *E) {
 
    if (auto *I = dyn_cast<InfixExpr>(E)) {
       llvm::outs() << " ( " << tok::getTokenName(I->getOperatorInfo().getKind());
+      llvm::outs() << " :" << I->getLeft()->getType()->getName() << ", " << I->getRight()->getType()->getName() << ": ";
       printInfixAST(I->getLeft());
       printInfixAST(I->getRight());
       llvm::outs() << " ) ";
    }
+   else if (auto *U = dyn_cast<PrefixExpr>(E)) {
+      llvm::outs() << " ( " << tok::getTokenName(U->getOperatorInfo().getKind());
+      llvm::outs() << " :" << U->getExpr()->getType()->getName() << ": ";
+      printInfixAST(U->getExpr());
+      llvm::outs() << " ) ";
+   } 
    else if (auto *D = dyn_cast<DoubleLiteral>(E)) {
       llvm::SmallVector<char, 16> Buffer;
       D->getValue().toString(Buffer);
       llvm::outs() << " d:" << Buffer << ",";
+   }
+   else if (auto *D = dyn_cast<BoolLiteral>(E)) {
+      llvm::outs() << "b:" << D->getValue() << ",";
    }
 }
 
@@ -1116,7 +1146,7 @@ int main(int argc_, char **argv_) {
       // }
 
       Expr *E = nullptr;
-      std::cout << Par.parseExpr(E) << "\n";
+      llvm::outs() << Par.parseExpr(E) << "\n";
       printInfixAST(E);
    }
 

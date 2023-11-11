@@ -568,6 +568,10 @@ inline bool isBinaryOp(tok::TokenKind K) {
    return getBinaryPrec(K) != Prec_None;
 }
 
+inline bool isLogicalBinOp(tok::TokenKind K) {
+   return getBinaryPrec(K) == Prec_Equality || getBinaryPrec(K) == Prec_Comparison;
+}
+
 }; // namespace op
 
 class OperatorInfo {
@@ -668,7 +672,7 @@ public:
 
 public:
    static bool classof(const Expr *E) {
-      return E->getKind() == EK_Double;
+      return E->getKind() == EK_Bool;
    }  
 };
 
@@ -869,6 +873,14 @@ class Sema {
 
    bool checkOperatorType(tok::TokenKind OpKind, TypeDecl *Ty) {
       switch (OpKind) {
+      case tok::equal:
+      case tok::bang_equal:
+      case tok::equal_equal:
+         return Ty == BoolType || Ty == DoubleType;
+      case tok::greater:
+      case tok::greater_equal:
+      case tok::less:
+      case tok::less_equal:
       case tok::plus:
       case tok::minus:
       case tok::star:
@@ -883,7 +895,22 @@ class Sema {
       }
       return false;
    }
-   
+
+public:
+   void enterScope(Decl *D) {
+      CurScope = new Scope(CurScope);
+      CurDecl = D;
+   }
+
+   void leaveScope() {
+      if (!CurScope)
+         llvm_unreachable("can't leave non-existing scope");
+      Scope *Parent = CurScope->getParent();
+      delete CurScope;
+      CurScope = Parent;
+      CurDecl = CurDecl->getEnclosingDecl();
+   }
+
 public:
    Sema()
       : CurScope(new Scope()), CurDecl(nullptr) {
@@ -895,10 +922,86 @@ public:
       CurScope->insert(BoolType);
    }
 
+   FunctionDecl *actOnFunctionDecl(SMLoc Loc, StringRef Name) {
+      FunctionDecl *FD = new FunctionDecl(CurDecl, Loc, Name);
+      if (!CurScope->insert(FD))
+         llvm_unreachable("Redeclaration of function");
+      return FD;
+   }
+
+   void actOnFunctionParamList(FunctionDecl *FunDecl, ParameterList &Params, Decl *RetTy) {
+      FunDecl->setParams(Params);
+      auto CastedRetTy = llvm::dyn_cast_or_null<TypeDecl>(RetTy);
+      if (!CastedRetTy && RetTy)
+         llvm_unreachable("bad return type");
+      else
+         FunDecl->setRetType(CastedRetTy);
+   }
+
+   void actOnFunctionBlock(DeclList &Decls, FunctionDecl *FunDecl, DeclList &FunDecls, StmtList &FunStmts) {
+      FunDecl->setDecls(FunDecls);
+      FunDecl->setStmts(FunStmts);
+      Decls.push_back(FunDecl);
+   }
+
+   void actOnFunctionParameters(ParameterList &Params, IdentList &ParIds, DeclList &ParTypes) {
+      if (!CurScope)
+         llvm_unreachable("current scope isn't set");
+      assert(ParIds.size() == ParTypes.size());
+
+      auto TypeIdx = ParTypes.begin();
+      for (auto Idx = ParIds.begin(), E = ParIds.end(); Idx != E; ++Idx, ++TypeIdx) {
+         if (auto *Ty = dyn_cast<TypeDecl>(*TypeIdx)) {
+            SMLoc Loc = Idx->first;
+            StringRef Name = Idx->second;
+            ParameterDecl *ParDecl = new ParameterDecl(CurDecl, Loc, Name, Ty, true);
+            if (CurScope->insert(ParDecl))
+              Params.push_back(ParDecl);
+            else
+               llvm_unreachable("such parameter already exists");
+         }
+         else
+            llvm_unreachable("not a type for parameter");
+      }
+
+   }
+
+   Decl *actOnTypeIdent(Decl *Prev, SMLoc Loc, StringRef Name) {
+      if (!Prev) {
+         if (Decl *D = CurScope->lookup(Name))
+            return D;
+      }
+      return nullptr;
+   }
+
+   void actOnVariableDecl(DeclList &Decls, Identifier Id, Decl *D) {
+      if (!CurScope)
+         llvm_unreachable("no current scope");
+      
+      if (TypeDecl *Ty = dyn_cast<TypeDecl>(D)) {
+         SMLoc Loc = Id.first;
+         StringRef Name = Id.second;
+         VariableDecl *Decl = new VariableDecl(CurDecl, Loc, Name, Ty);
+         if (CurScope->insert(Decl))
+            Decls.push_back(Decl);
+         else
+            llvm_unreachable("variable already defined");
+      }
+      else 
+         llvm_unreachable("no such type in var decl");
+   }
+
    Expr *actOnDoubleLiteral(SMLoc Loc, StringRef Literal) {
       return new DoubleLiteral(Loc, llvm::APFloat(llvm::APFloat::IEEEdouble(), Literal), DoubleType);
    }
-   
+
+   Expr *actOnBoolLiteral(tok::TokenKind K) {
+      if (K == tok::kw_true)
+         return TrueLiteral;
+      else
+         return FalseLiteral;
+   }
+
    Expr *actOnInfixExpr(Expr *Left, Expr *Right, const OperatorInfo &Op) {
       if (!Left)
          return Right;
@@ -912,6 +1015,8 @@ public:
       if (!checkOperatorType(Op.getKind(), Ty))
          llvm_unreachable("incompatible operator for vals");
 
+      bool RetTypeIsBool = op::isLogicalBinOp(Op.getKind());
+      Ty = RetTypeIsBool ? BoolType : Ty;
       return new InfixExpr(Left, Right, Op, Ty);
    }
 
@@ -961,14 +1066,6 @@ public:
       return true;
    }
 
-   bool checkToken(tok::TokenKind Kind) {
-      return !CurTok.is(Kind);
-   }
-
-   bool checkToken(std::initializer_list<tok::TokenKind> &&Kinds) {
-      return !CurTok.isOneOf(std::move(Kinds));
-   }
-
    OperatorPrec getBinOperatorPrec() {
       return op::getBinaryPrec(CurTok.getKind());
    } 
@@ -978,16 +1075,149 @@ public:
    }
 
    bool parseProgram();
-   bool parseDecl();
-   bool parseVariableDecl();
-   bool parseFunctionDecl();
-   bool parseParameterDecl();
+   
+   bool parseDecl(DeclList &Decls) {
+      switch (CurTok.getKind()) {
+      case tok::kw_var:
+         return parseVariableDecl(Decls);
+      case tok::kw_fun:
+         return parseFunctionDecl(Decls);
+      default:
+         break;
+      }
+      return true;
+   }
+   
+   bool parseVariableDecl(DeclList &Decls) {
+      if (consumeToken(tok::kw_var))
+         return true;
+      if (CurTok.isNot(tok::identifier))
+         return true;
+      Identifier VarId {CurTok.getLocation(), CurTok.getIdentifier()};
+      nextToken();
+
+      if (consumeToken(tok::colon))
+         return true;
+
+      Decl *D;
+      if (parseTypeIdent(D))
+         return true;
+
+      Sem.actOnVariableDecl(Decls, VarId, D);
+      
+      if (consumeToken(tok::semicolon))
+         return true;
+
+      return false;
+   }
+
+   bool parseTypeIdent(Decl *&D) {
+      D = nullptr;
+      if (CurTok.is(tok::kw_nil))
+         return false;
+      if (CurTok.isNot(tok::identifier))
+         return true;
+      D = Sem.actOnTypeIdent(D, CurTok.getLocation(),  CurTok.getIdentifier());
+      nextToken();
+      return false;
+   }
+
+   bool parseFunctionParameter(IdentList &ParIds, DeclList &ParTypes) {
+      if (CurTok.is(tok::identifier))
+         return true;
+      ParIds.emplace_back(CurTok.getLocation(), CurTok.getIdentifier());
+      nextToken();
+
+      if (consumeToken(tok::colon))
+         return true;
+
+      Decl *D;
+      if (parseTypeIdent(D))
+         return true;
+      ParTypes.push_back(D);
+
+      return false;      
+   }
+
+   bool parseFunctionParameterList(ParameterList &Params) {
+      if (CurTok.isNot(tok::identifier))
+         return true;
+      
+      IdentList ParIds;
+      DeclList ParTypes;
+      if (parseFunctionParameter(ParIds, ParTypes))
+         return true;
+      while (CurTok.is(tok::comma)) {
+         if (parseFunctionParameter(ParIds, ParTypes))
+            return true;
+      }
+      Sem.actOnFunctionParameters(Params, ParIds, ParTypes);
+      return false;
+   }
+
+   bool parseBlock(DeclList &Decls, StmtList &Stmts) {
+      if (consumeToken(tok::l_brace))
+         return true;
+      
+      while (CurTok.isNot(tok::eof) && CurTok.isNot(tok::r_brace))
+         nextToken();
+
+      if (consumeToken(tok::r_brace))
+         return true;
+
+      return false;
+   }
+
+   bool parseFunctionDecl(DeclList &Decls) {
+      if (consumeToken(tok::kw_fun))
+         return true;
+
+      if (CurTok.isNot(tok::identifier))
+         return true;
+      Identifier FuncId {CurTok.getLocation(), CurTok.getIdentifier()};
+      nextToken();
+
+      // here we need to create function -> add it to scope
+      // and enter its scope -> parse parameters and add them to funcs' scope
+      
+      FunctionDecl *FunDecl = Sem.actOnFunctionDecl(CurTok.getLocation(), CurTok.getIdentifier());
+      Sem.enterScope(FunDecl);
+      if (consumeToken(tok::l_paren))
+         return true;
+
+      ParameterList FunParams;
+      if (parseFunctionParameterList(FunParams))
+         return true;
+
+      if (consumeToken(tok::r_paren))
+         return true;
+      if (consumeToken(tok::colon))
+         return true;
+      
+      Decl *RetTy;
+      if (parseTypeIdent(RetTy))
+         return true;
+       
+      Sem.actOnFunctionParamList(FunDecl, FunParams, RetTy);
+
+      DeclList FunDecls;
+      StmtList FunStmts;
+      if (parseBlock(FunDecls, FunStmts))
+         return true;
+      
+      Sem.actOnFunctionBlock(Decls, FunDecl, FunDecls, FunStmts);
+      return false;
+   }
 
    bool parseIdentifierExpr(Expr *&E) {
+      Identifier Id (CurTok.getLocation(), CurTok.getIdentifier());
+      nextToken();
+
       // here we need to take the value from var
       // or call a function
       return true;
    }
+
    bool parseStringLiteral(Expr *&E) {
       return true;
    }
@@ -1003,6 +1233,16 @@ public:
    bool parseDoubleLiteral(Expr *&E) {
       if (CurTok.is(tok::double_literal)) {
          E = Sem.actOnDoubleLiteral(CurTok.getLocation(), CurTok.getLiteral());
+         assert(isa<DoubleLiteral>(E));
+         nextToken();
+         return false;
+      }
+      return true;
+   }
+
+   bool parseBoolLiteral(Expr *&E) {
+      if (CurTok.isOneOf({tok::kw_false, tok::kw_true})) {
+         E = Sem.actOnBoolLiteral(CurTok.getKind());
          nextToken();
          return false;
       }
@@ -1013,7 +1253,7 @@ public:
       switch (CurTok.getKind()) {
       case tok::kw_false:
       case tok::kw_true:
-         return true; // TODO: do smth on false and true
+         return parseBoolLiteral(E);  // TODO: do smth on false and true
       case tok::identifier:
          return parseIdentifierExpr(E);
       case tok::double_literal:
@@ -1085,19 +1325,33 @@ public:
    
 };
 
+static void printDecl(Decl *D) {
+   if (!D) return;
+
+   if (auto *V = dyn_cast<VariableDecl>(D)) {
+      llvm::outs() << "Var: " << V->getName() << ", <" << V->getType()->getName() << ">\n";
+   }
+}
+
+static void printDeclList(const DeclList &Decls) {
+   for (auto D : Decls) {
+      printDecl(D);
+   }
+}
+
 static void printInfixAST(Expr *E) {
    if (!E) return;
 
    if (auto *I = dyn_cast<InfixExpr>(E)) {
       llvm::outs() << " ( " << tok::getTokenName(I->getOperatorInfo().getKind());
-      llvm::outs() << " :" << I->getLeft()->getType()->getName() << ", " << I->getRight()->getType()->getName() << ": ";
+      llvm::outs() << " <" << I->getLeft()->getType()->getName() << ", " << I->getRight()->getType()->getName() << "> ";
       printInfixAST(I->getLeft());
       printInfixAST(I->getRight());
       llvm::outs() << " ) ";
    }
    else if (auto *U = dyn_cast<PrefixExpr>(E)) {
       llvm::outs() << " ( " << tok::getTokenName(U->getOperatorInfo().getKind());
-      llvm::outs() << " :" << U->getExpr()->getType()->getName() << ": ";
+      llvm::outs() << " <" << U->getExpr()->getType()->getName() << "> ";
       printInfixAST(U->getExpr());
       llvm::outs() << " ) ";
    } 
@@ -1107,7 +1361,7 @@ static void printInfixAST(Expr *E) {
       llvm::outs() << " d:" << Buffer << ",";
    }
    else if (auto *D = dyn_cast<BoolLiteral>(E)) {
-      llvm::outs() << "b:" << D->getValue() << ",";
+      llvm::outs() << "b:" << ((D->getValue()) ? "true" : "false")  << ", ";
    }
 }
 
@@ -1145,9 +1399,14 @@ int main(int argc_, char **argv_) {
       //    Lex.getNextToken(Tok);
       // }
 
-      Expr *E = nullptr;
-      llvm::outs() << Par.parseExpr(E) << "\n";
-      printInfixAST(E);
+      // Expr *E = nullptr;
+      // llvm::outs() << Par.parseExpr(E) << "\n";
+      // printInfixAST(E);
+
+      DeclList Decls;
+      while (!Par.parseDecl(Decls))
+         llvm::outs() << 0 << " " << "\n";
+      printDeclList(Decls);
    }
 
    return 0;

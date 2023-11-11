@@ -5,11 +5,14 @@ Lox lang is a lang from Crafting Interpreters.
 I want to make it static -> we need to change grammar a bit. Add something like:
 ```
 var a: int = 5;
-fun foo(a: int, b: int) -> int {
+fun foo(a: int, b: int) : int {
    return a + b;
 }
 ```
-IS IT NEEDED? (YES IT'S NEEDED)
+
+```
+var a, b: int = 5, 6; // DO WE NEED THIS?
+```
 
 Grammar:
 ```
@@ -76,14 +79,10 @@ DIGIT          → "0" ... "9" ;
 TODO:
 
 1. Lexer - minimal done
-2. Parser 
-
-Firstly I need to write parser for expressions -> only then we'll continue.
-
+2. Parser - for exprs 
+3. Sema - for exprs
+4. AST Printer
+5. Error Printer
+------------------------
 3. Translate language to IR - .
 4. ... 
-
-Firstly I implement all basics in one file -> then split to normal project config
-
-As we've added simple AST, firstly we need to parse expressions, to do it
-we need to 

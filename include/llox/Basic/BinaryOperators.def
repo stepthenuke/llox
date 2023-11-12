@@ -1,0 +1,30 @@
+#ifndef BINARY_OPERATOR
+#define BINARY_OPERATOR(ID, SP, PR) ID
+#endif
+#ifndef KW_OPERATOR
+#define KW_OPERATOR(ID, SP, PR) BINARY_OPERATOR(kw_ ## ID, SP, PR)
+#endif
+
+BINARY_OPERATOR(equal, "=", Prec_Assignment)
+
+KW_OPERATOR(or, "or", Prec_Or)
+KW_OPERATOR(and, "and", Prec_And)
+
+BINARY_OPERATOR(bang_equal, "!=", Prec_Equality)
+BINARY_OPERATOR(equal_equal, "==", Prec_Equality)
+
+BINARY_OPERATOR(greater, ">", Prec_Comparison)
+BINARY_OPERATOR(greater_equal, ">=", Prec_Comparison)
+BINARY_OPERATOR(less, "<", Prec_Comparison)
+BINARY_OPERATOR(less_equal, "<=", Prec_Comparison)
+
+BINARY_OPERATOR(plus, "+", Prec_Term)
+BINARY_OPERATOR(minus, "-", Prec_Term)
+
+BINARY_OPERATOR(star, "*", Prec_Factor)
+BINARY_OPERATOR(slash, "/", Prec_Factor)
+
+BINARY_OPERATOR(dot, ".", Prec_Call)
+
+#undef KW_OPERATOR
+#undef BINARY_OPERATOR

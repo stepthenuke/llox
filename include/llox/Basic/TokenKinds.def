@@ -1,0 +1,67 @@
+#ifndef TOK
+#define TOK(ID)
+#endif
+#ifndef PUNCTUATOR
+#define PUNCTUATOR(ID, SP) TOK(ID)
+#endif
+#ifndef AMBIG_PUNCTUATOR
+#define AMBIG_PUNCTUATOR(ID, SP) TOK(ID) 
+#endif
+#ifndef KEYWORD  
+#define KEYWORD(ID, KW) TOK(kw_ ## ID)
+#endif
+
+TOK(unknown)
+TOK(eof)
+TOK(identifier)
+TOK(double_literal)
+TOK(string_literal)
+
+PUNCTUATOR(l_paren, "(")
+PUNCTUATOR(r_paren, ")")
+PUNCTUATOR(l_brace, "{")
+PUNCTUATOR(r_brace, "}")
+PUNCTUATOR(l_bracket, "[")
+PUNCTUATOR(r_bracket, "]")
+PUNCTUATOR(comma, ",")
+PUNCTUATOR(dot, ".")
+PUNCTUATOR(minus, "-")
+PUNCTUATOR(plus, "+")
+PUNCTUATOR(colon, ":")
+PUNCTUATOR(semicolon, ";")
+PUNCTUATOR(star, "*")
+PUNCTUATOR(hash, "#")
+PUNCTUATOR(single_quote, "'")
+
+AMBIG_PUNCTUATOR(double_quote, "\"")
+AMBIG_PUNCTUATOR(slash, "/")
+AMBIG_PUNCTUATOR(bang, "!")
+AMBIG_PUNCTUATOR(bang_equal, "!=")
+AMBIG_PUNCTUATOR(equal, "=")
+AMBIG_PUNCTUATOR(equal_equal, "==")
+AMBIG_PUNCTUATOR(greater, ">")
+AMBIG_PUNCTUATOR(greater_equal, ">=")
+AMBIG_PUNCTUATOR(less, "<")
+AMBIG_PUNCTUATOR(less_equal, "<=")
+
+KEYWORD(and, "and")
+KEYWORD(class, "class")
+KEYWORD(else, "else")
+KEYWORD(false, "false")
+KEYWORD(fun, "fun")
+KEYWORD(for, "for")
+KEYWORD(if, "if")
+KEYWORD(nil, "nil")
+KEYWORD(or, "or")
+KEYWORD(print, "print")
+KEYWORD(return, "return")
+KEYWORD(super, "super")
+KEYWORD(this, "this")
+KEYWORD(true, "true")
+KEYWORD(var, "var")
+KEYWORD(while, "while")
+
+#undef TOK
+#undef PUNCTUATOR
+#undef AMBIG_PUNCTUATOR
+#undef KEYWORD

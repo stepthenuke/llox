@@ -1,0 +1,2 @@
+create_subdirectory_options(LLOX TOOL)
+add_tinylang_subdirectory(driver)

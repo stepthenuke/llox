@@ -21,6 +21,7 @@ using llvm::StringRef;
 using llvm::cast;
 using llvm::isa;
 using llvm::dyn_cast;
+using llvm::dyn_cast_or_null;
 
 namespace charinfo {
 
@@ -444,6 +445,10 @@ public:
    
    bool isVar() const {
       return IsVar;
+   }
+
+   TypeDecl *getType() {
+      return Ty;
    }
 
 public:
@@ -891,6 +896,7 @@ class Sema {
       case tok::kw_or:
          return Ty == BoolType;
       default:
+         llvm::outs() <<tok::getTokenName(OpKind) << " ";
          llvm_unreachable("unknown operator");
       }
       return false;
@@ -921,7 +927,7 @@ public:
       CurScope->insert(DoubleType);
       CurScope->insert(BoolType);
    }
-
+   
    FunctionDecl *actOnFunctionDecl(SMLoc Loc, StringRef Name) {
       FunctionDecl *FD = new FunctionDecl(CurDecl, Loc, Name);
       if (!CurScope->insert(FD))
@@ -966,7 +972,7 @@ public:
 
    }
 
-   Decl *actOnTypeIdent(Decl *Prev, SMLoc Loc, StringRef Name) {
+   Decl *actOnNameLookup(Decl *Prev, SMLoc Loc, StringRef Name) {
       if (!Prev) {
          if (Decl *D = CurScope->lookup(Name))
             return D;
@@ -1029,6 +1035,38 @@ public:
          llvm_unreachable("incompatible operator for val");
    
       return new PrefixExpr(E, Op, Ty);
+   }
+
+   void checkFunctionParameterTypes(const ParameterList &Params, const ExprList &Exprs) {
+      if (Params.size() != Exprs.size())
+         llvm_unreachable("params size != parameter exprs size");
+      
+      auto E = Exprs.begin();
+      for (auto P = Params.begin(), PE = Params.end(); P != PE; ++P, ++E) {
+         ParameterDecl *Par = *P;
+         Expr *Expr = *E;
+         if (Par->getType() != Expr->getType())
+            llvm_unreachable("param and args types of function do not correspond");
+      }
+   }
+
+   Expr *actOnFunctionCallExpr(Identifier &FunId, ExprList &ParamExprs) {
+      Decl *D = actOnNameLookup(CurDecl, FunId.first, FunId.second);
+      D = new FunctionDecl(nullptr, SMLoc(), StringRef("TEST_FUNC"));
+      if (auto *F = dyn_cast<FunctionDecl>(D)) {
+         // checkFunctionParameterTypes(F->getParams(), ParamExprs);
+         F->setRetType(DoubleType); 
+         return new FunctionCallExpr(F, ParamExprs);
+      }
+      llvm_unreachable("no call function");
+      return nullptr;
+   }
+
+   Expr *actOnVariableExpr(Identifier &Id) {
+      Decl *D = actOnNameLookup(CurDecl, Id.first, Id.second);
+      // what're we doing here?
+      return new DoubleLiteral(Id.first,  llvm::APFloat(llvm::APFloat::IEEEdouble(), 228), DoubleType);
+      return nullptr;
    }
 };
 
@@ -1117,13 +1155,13 @@ public:
          return false;
       if (CurTok.isNot(tok::identifier))
          return true;
-      D = Sem.actOnTypeIdent(D, CurTok.getLocation(),  CurTok.getIdentifier());
+      D = Sem.actOnNameLookup(D, CurTok.getLocation(),  CurTok.getIdentifier());
       nextToken();
       return false;
    }
 
    bool parseFunctionParameter(IdentList &ParIds, DeclList &ParTypes) {
-      if (CurTok.is(tok::identifier))
+      if (CurTok.isNot(tok::identifier))
          return true;
       ParIds.emplace_back(CurTok.getLocation(), CurTok.getIdentifier());
       nextToken();
@@ -1140,6 +1178,11 @@ public:
    }
 
    bool parseFunctionParameterList(ParameterList &Params) {
+      if (CurTok.is(tok::r_paren)) {
+         nextToken();
+         return false;
+      }
+
       if (CurTok.isNot(tok::identifier))
          return true;
       
@@ -1148,9 +1191,14 @@ public:
       if (parseFunctionParameter(ParIds, ParTypes))
          return true;
       while (CurTok.is(tok::comma)) {
+         nextToken(); // eat comma
          if (parseFunctionParameter(ParIds, ParTypes))
             return true;
       }
+
+      if (consumeToken(tok::r_paren))
+         return true;
+
       Sem.actOnFunctionParameters(Params, ParIds, ParTypes);
       return false;
    }
@@ -1174,14 +1222,13 @@ public:
 
       if (CurTok.isNot(tok::identifier))
          return true;
-      Identifier FuncId {CurTok.getLocation(), CurTok.getIdentifier()};
+      FunctionDecl *FunDecl = Sem.actOnFunctionDecl(CurTok.getLocation(), CurTok.getIdentifier());
+      Sem.enterScope(FunDecl);
       nextToken();
 
       // here we need to create function -> add it to scope
       // and enter its scope -> parse parameters and add them to funcs' scope
       
-      FunctionDecl *FunDecl = Sem.actOnFunctionDecl(CurTok.getLocation(), CurTok.getIdentifier());
-      Sem.enterScope(FunDecl);
       if (consumeToken(tok::l_paren))
          return true;
 
@@ -1189,8 +1236,6 @@ public:
       if (parseFunctionParameterList(FunParams))
          return true;
 
-      if (consumeToken(tok::r_paren))
-         return true;
       if (consumeToken(tok::colon))
          return true;
       
@@ -1209,13 +1254,44 @@ public:
       return false;
    }
 
+   bool parseExprList(ExprList &Exprs) {
+      Expr *E = nullptr;
+      if (parseExpr(E))
+         return true;
+      if (E)
+         Exprs.push_back(E);
+
+      while (CurTok.is(tok::comma)) {
+         nextToken();
+         E = nullptr;
+         if (parseExpr(E))
+            return true;
+         if (E)
+            Exprs.push_back(E);
+      }
+      return false;
+   }
+
    bool parseIdentifierExpr(Expr *&E) {
+      if (CurTok.isNot(tok::identifier))
+         return true;
+      
       Identifier Id (CurTok.getLocation(), CurTok.getIdentifier());
       nextToken();
+      if (CurTok.isNot(tok::l_paren)) {
+         E = Sem.actOnVariableExpr(Id);
+         return false;
+      }
+      nextToken();
 
-      // here we need to take the value from var
-      // or call a function
-      return true;
+      ExprList ParamExprs;
+      if (parseExprList(ParamExprs))
+         return true;
+      
+      if (consumeToken(tok::r_paren))
+         return true;
+      E = Sem.actOnFunctionCallExpr(Id, ParamExprs);
+      return false;
    }
 
    bool parseStringLiteral(Expr *&E) {
@@ -1270,7 +1346,10 @@ public:
    bool parseExpr(Expr *&E) {
       if (parsePrefixExpr(E))
          return true;
+      assert(E != nullptr);
       if (!E)
+         return false;
+      if (CurTok.is(tok::r_paren))
          return false;
 
       return parseInfixExpr(op::Prec_None, E);
@@ -1278,12 +1357,17 @@ public:
    
    bool parseInfixExpr(OperatorPrec LeftPrec, Expr *&Left) {
       while (true) {
+         if (CurTok.is(tok::comma)) {
+            return false;
+         }
+
+         
          OperatorInfo BinOp(CurTok.getLocation(), CurTok.getKind());
          OperatorPrec BinOpPrec = BinOp.getBinPrec();
-         
+
          if (BinOpPrec < LeftPrec)
             return false;
-         
+
          nextToken(); // eat BinOp
 
          // there can be expr: 10 + -1 -> parsing + -> we find unary expr
@@ -1325,11 +1409,25 @@ public:
    
 };
 
+static void printDeclList(const DeclList &Decls);
+static void printParameterList(const ParameterList &Decls); 
+
 static void printDecl(Decl *D) {
    if (!D) return;
 
    if (auto *V = dyn_cast<VariableDecl>(D)) {
       llvm::outs() << "Var: " << V->getName() << ", <" << V->getType()->getName() << ">\n";
+   }
+   if (auto *P = dyn_cast<ParameterDecl>(D)) {
+      llvm::outs() << P->getName() << " <" << P->getType()->getName() << ">, ";
+   }
+   else if (auto *F = dyn_cast<FunctionDecl>(D)) {
+      llvm::outs() << "Fun: " << F->getName() << "( ";
+      printParameterList(F->getParams());
+      llvm::outs() << ") " << " <" << F->getRetType()->getName() << ">\n";
+      llvm::outs() << "--------------------------------\n";
+      printDeclList(F->getDecls());
+      llvm::outs() << "--------------------------------\n";
    }
 }
 
@@ -1337,6 +1435,12 @@ static void printDeclList(const DeclList &Decls) {
    for (auto D : Decls) {
       printDecl(D);
    }
+}
+
+static void printParameterList(const ParameterList &Decls) {
+   for (auto D : Decls) {{
+      printDecl(D);
+   }}
 }
 
 static void printInfixAST(Expr *E) {
@@ -1362,6 +1466,9 @@ static void printInfixAST(Expr *E) {
    }
    else if (auto *D = dyn_cast<BoolLiteral>(E)) {
       llvm::outs() << "b:" << ((D->getValue()) ? "true" : "false")  << ", ";
+   }
+   else if (auto *FC = dyn_cast<FunctionCallExpr>(E)) {
+      llvm::outs() << " function call ";
    }
 }
 
@@ -1399,14 +1506,14 @@ int main(int argc_, char **argv_) {
       //    Lex.getNextToken(Tok);
       // }
 
-      // Expr *E = nullptr;
-      // llvm::outs() << Par.parseExpr(E) << "\n";
-      // printInfixAST(E);
+      Expr *E = nullptr;
+      llvm::outs() << Par.parseExpr(E) << "\n";
+      printInfixAST(E);
 
-      DeclList Decls;
-      while (!Par.parseDecl(Decls))
-         llvm::outs() << 0 << " " << "\n";
-      printDeclList(Decls);
+      // DeclList Decls;
+      // while (!Par.parseDecl(Decls))
+      //    llvm::outs() << 0 << " " << "\n";
+      // printDeclList(Decls);
    }
 
    return 0;

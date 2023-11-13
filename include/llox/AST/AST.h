@@ -1,6 +1,17 @@
 #ifndef LLOX_AST_AST_H
 #define LLOX_AST_AST_H
 
+#include <vector>
+#include <string>
+
+#include "llox/Basic/LLVM.h"
+#include "llox/Basic/TokenKinds.h"
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/SMLoc.h"
+
+namespace llox {
+
 class Decl;
 class Stmt;
 class Expr;
@@ -423,5 +434,7 @@ public:
       return S->getKind() == SK_Return;
    } 
 };
+
+} //namespace llox
 
 #endif

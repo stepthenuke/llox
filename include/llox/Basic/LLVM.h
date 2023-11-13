@@ -1,7 +1,6 @@
 #ifndef LLOX_BASIC_LLVM_H
 #define LLOX_BASIC_LLVM_H
 
-#include "llvm/ADT/None.h"
 #include "llvm/Support/Casting.h"
 
 namespace llvm {

@@ -2,38 +2,6 @@
 
 namespace llox {
 
-namespace charinfo {
-
-inline bool isASCII(char C) {
-   return static_cast<unsigned char>(C) <= 127;
-}
-
-inline bool isDigit(char C) {
-   return isASCII(C) && ('0' <= C && C <= '9');
-}
-
-inline bool isAlpha(char C) {
-   return isASCII(C) && (('a' <= C && C <= 'z') || ('A' <= C && C <= 'Z') || C == '_');
-}
-
-inline bool isAlphanumeric(char C) {
-   return isAlpha(C) || isDigit(C);
-}
-
-inline bool isVerticalWhitespace(char C) {
-   return isASCII(C) && (C == '\n' || C == '\r');
-}
-
-inline bool isHorizontalWhitespace(char C) {
-   return isASCII(C) && ( C == ' ' || C == '\t');
-}
-
-inline bool isWhitespace(char C) {
-   return isVerticalWhitespace(C) || isHorizontalWhitespace(C);
-}
-
-} // namespace charinfo
-
 void Token::setPointer(const char *P) {
    Ptr = P;
 }

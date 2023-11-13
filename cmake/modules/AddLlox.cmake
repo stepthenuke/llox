@@ -8,8 +8,7 @@ macro(add_llox_library name)
    else()
       set(LIBTYPE STATIC)
    endif()
-
-   llvm_add_library(&{name} ${LIBTYPE} ${ARGN})
+   llvm_add_library(${name} ${LIBTYPE} ${ARGN})
    if(TARGET ${name})
       target_link_libraries(${name} INTERFACE ${LLVM_COMMON_LIBS})
       install (TARGETS ${name}

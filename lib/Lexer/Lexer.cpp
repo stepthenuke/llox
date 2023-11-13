@@ -10,12 +10,12 @@ void KeywordFilter::addKeywords() {
 // -------------------------------------------------------------
 #define KEYWORD(NAME, SP) \
    addKeyword(StringRef(#NAME), tok::kw_##NAME);
-#include "TokenKinds.def"
+#include "llox/Basic/TokenKinds.def"
 // -------------------------------------------------------------
 }
 
 tok::TokenKind KeywordFilter::getKeyword(StringRef Name, tok::TokenKind TokenIfNotFound = tok::unknown) {
-   // std::cout << "kw: " << Name.str() << std::endl;
+   // llvm::outs() << "kw: " << Name.str() << std::endl;
    auto Res = Table.find(Name);
    if (Res != Table.end())
       return Res->second;
@@ -50,7 +50,7 @@ void Lexer::getNextToken(Token &Tok) {
       return
 // -------------------------------------------------------------
 #define PUNCTUATOR(ID, SP) CASE(SP, tok::ID);
-#include "TokenKinds.def"
+#include "llox/Basic/TokenKinds.def"
 // -------------------------------------------------------------
 #undef CASE
 // -------------------------------------------------------------
@@ -115,13 +115,12 @@ void Lexer::formToken(Token &Tok, const char *TokEnd, tok::TokenKind Kind) {
    Tok.setPointer(BufPtr);
    size_t TokLen = TokEnd - BufPtr;
    Tok.setLength(TokLen);
-   std::cout << StringRef(BufPtr, TokLen).str() << " : ";
-   std::cout << Tok.getName().str() << "\n";
+   llvm::outs() << StringRef(BufPtr, TokLen).str() << " : ";
+   llvm::outs() << Tok.getName().str() << "\n";
    BufPtr = TokEnd;
 }
 
 void Lexer::setString(Token &Tok) {
-   const char *Start = BufPtr;
    const char *End = BufPtr + 1;
 
    while (*End && *End != '"') {
@@ -135,7 +134,6 @@ void Lexer::setString(Token &Tok) {
 }
 
 void Lexer::setNumber(Token &Tok) {
-   const char *Start = BufPtr;
    const char *End = BufPtr + 1;
 
    int DotCnt = 0;

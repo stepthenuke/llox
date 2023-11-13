@@ -2,11 +2,13 @@
 #define LLOX_LEXER_LEXER_H
 
 #include "llox/Basic/LLVM.h"
+#include "llox/Basic/TokenKinds.h"
 #include "llox/Token/Token.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace llox {
 
@@ -17,7 +19,7 @@ class KeywordFilter {
 
 public:
    void addKeywords();
-   tok::TokenKind getKeyword(StringRef Name, tok::TokenKind TokenIfNotFound = tok::unknown);
+   tok::TokenKind getKeyword(StringRef Name, tok::TokenKind TokenIfNotFound);
 };
 
 class Lexer {

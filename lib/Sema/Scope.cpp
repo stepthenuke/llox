@@ -2,9 +2,6 @@
 
 namespace llox {
 
-Scope::Scope(Scope *Parent = nullptr)
-   : Parent(Parent) {}
-
 Scope *Scope::getParent() {
    return Parent;
 }

@@ -26,15 +26,17 @@ namespace llox {
       return true;
    }
 
-   OperatorPrec Parser::getBinOperatorPrec() {
+   op::OperatorPrec Parser::getBinOperatorPrec() {
       return op::getBinaryPrec(CurTok.getKind());
    } 
 
-   OperatorPrec Parser::getUnOperatorPrec() {
+   op::OperatorPrec Parser::getUnOperatorPrec() {
       return op::getUnaryPrec(CurTok.getKind());
    }
 
-   bool Parser::parseProgram();
+   bool Parser::parseProgram() {
+      return true;
+   }
    
    bool Parser::parseDecl(DeclList &Decls) {
       switch (CurTok.getKind()) {

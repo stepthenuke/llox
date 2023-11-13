@@ -36,11 +36,52 @@ enum OperatorPrec {
 
 OperatorPrec getUnaryPrec(tok::TokenKind K);
 OperatorPrec getBinaryPrec(tok::TokenKind K);
-inline bool isUnaryOp(tok::TokenKind K);
-inline bool isBinaryOp(tok::TokenKind K);
-inline bool isLogicalBinOp(tok::TokenKind K);
+
+inline bool isUnaryOp(tok::TokenKind K) {
+   return getUnaryPrec(K) != Prec_None;
+}
+
+inline bool isBinaryOp(tok::TokenKind K) {
+   return getBinaryPrec(K) != Prec_None;
+}
+
+inline bool isLogicalBinOp(tok::TokenKind K) {
+   return getBinaryPrec(K) == Prec_Equality || getBinaryPrec(K) == Prec_Comparison;
+}
 
 }; // namespace op
+
+namespace charinfo {
+
+inline bool isASCII(char C) {
+   return static_cast<unsigned char>(C) <= 127;
+}
+
+inline bool isDigit(char C) {
+   return isASCII(C) && ('0' <= C && C <= '9');
+}
+
+inline bool isAlpha(char C) {
+   return isASCII(C) && (('a' <= C && C <= 'z') || ('A' <= C && C <= 'Z') || C == '_');
+}
+
+inline bool isAlphanumeric(char C) {
+   return isAlpha(C) || isDigit(C);
+}
+
+inline bool isVerticalWhitespace(char C) {
+   return isASCII(C) && (C == '\n' || C == '\r');
+}
+
+inline bool isHorizontalWhitespace(char C) {
+   return isASCII(C) && ( C == ' ' || C == '\t');
+}
+
+inline bool isWhitespace(char C) {
+   return isVerticalWhitespace(C) || isHorizontalWhitespace(C);
+}
+
+} // namespace charinfo
 
 } // namespace llox
 

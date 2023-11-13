@@ -15,8 +15,8 @@ class Token {
    tok::TokenKind Kind;
 
 public:
-   void setPointer(const char *P) 
-   const char *getPointer() const
+   void setPointer(const char *P);
+   const char *getPointer() const;
 
    SMLoc getLocation() const;
   

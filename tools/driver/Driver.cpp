@@ -7,6 +7,9 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 
+using namespace llvm;
+using namespace llox;
+
 int main(int argc_, char **argv_) {
 
    // for (unsigned short i = 0; i < tok::TOKEN_AMT; ++i) {

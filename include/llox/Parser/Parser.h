@@ -1,6 +1,14 @@
 #ifndef LLOX_PARSER_PARSER_H
 #define LLOX_PARSER_PARSER_H
 
+#include "llox/AST/AST.h"
+#include "llox/Basic/TokenKinds.h"
+#include "llox/Lexer/Lexer.h"
+#include "llox/Sema/Sema.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
+
 namespace llox {
 
 class Parser {
@@ -11,7 +19,7 @@ class Parser {
    using OperatorPrec = op::OperatorPrec;
 
 public:
-   Parser(Lexer &L, Sema &S)
+   Parser(Lexer &L, Sema &S);
 
 public:
    void nextToken();

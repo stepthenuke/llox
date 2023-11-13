@@ -9,6 +9,6 @@ set(LLVM_LINK_COMPONENTS ${LLVM_TARGETS_TO_BUILD}
 add_llox_tool(llox Driver.cpp SUPPORT_PLUGINS)
 
 target_link_libraries(llox
-   PRIVATE lloxBasic lloxCodeGen
+   PRIVATE lloxBasic lloxParser
    lloxLexer lloxParser lloxSema
 )

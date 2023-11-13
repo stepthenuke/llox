@@ -1,4 +1,5 @@
 #include "llox/Basic/TokenKinds.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace llox {
 namespace tok {
@@ -65,18 +66,6 @@ OperatorPrec getBinaryPrec(tok::TokenKind K) {
    default: return Prec_None;
    }
 };
-
-inline bool isUnaryOp(tok::TokenKind K) {
-   return getUnaryPrec(K) != Prec_None;
-}
-
-inline bool isBinaryOp(tok::TokenKind K) {
-   return getBinaryPrec(K) != Prec_None;
-}
-
-inline bool isLogicalBinOp(tok::TokenKind K) {
-   return getBinaryPrec(K) == Prec_Equality || getBinaryPrec(K) == Prec_Comparison;
-}
 
 }; // namespace op
 

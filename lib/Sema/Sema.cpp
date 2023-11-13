@@ -1,5 +1,4 @@
 #include "llox/Sema/Sema.h"
-#include "llox/Sema/Scope.h"
 
 namespace llox {
 

@@ -1,6 +1,27 @@
 ## llox = LLVM + lox
-
 Lox lang is a lang from Crafting Interpreters.
+
+## TODO:
+
+1. Lexer - minimal done
+2. Parser - minimal done
+3. Sema - for exprs, decls
+4. AST Printer
+5. Error Printer
+------------------------
+3. Translate language to IR - .
+4. ... 
+
+## Build
+```
+cd llox
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR=../folder_with_llvm_build/lib/cmake/llvm \ 
+-DCMAKE_INSTALL_PREFIX=../llox_install_folder ..
+
+make
+make install
+```
 
 I want to make it static -> we need to change grammar a bit. Add something like:
 ```
@@ -76,13 +97,5 @@ ALPHA          → "a" ... "z" | "A" ... "Z" | "_" ;
 DIGIT          → "0" ... "9" ;
 ```
 
-TODO:
 
-1. Lexer - minimal done
-2. Parser - for exprs 
-3. Sema - for exprs
-4. AST Printer
-5. Error Printer
-------------------------
-3. Translate language to IR - .
-4. ... 
+

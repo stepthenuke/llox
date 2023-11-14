@@ -1,4 +1,5 @@
 #include "llox/AST/AST.h"
+#include "llox/AST/ASTPrinter.h"
 #include "llox/Basic/LLVM.h"
 #include "llox/Parser/Parser.h"
 #include "llox/Sema/Sema.h"
@@ -37,16 +38,20 @@ int main(int argc_, char **argv_) {
 
       auto Sem = Sema();
       auto Par = Parser(Lex, Sem);
-
+      
       // Token Tok;
       // Tok.setKind(tok::unknown);
       // while (Tok.isNot(tok::eof)) {
       //    Lex.getNextToken(Tok);
       // }
 
+      StmtList Stmts;
+      llvm::outs() << Par.parseStmtList(Stmts) << "\n";
+      print(Stmts);
+
       // Expr *E = nullptr;
       // llvm::outs() << Par.parseExpr(E) << "\n";
-      // printInfixAST(E);
+      // print(E);
 
       // DeclList Decls;
       // while (!Par.parseDecl(Decls))

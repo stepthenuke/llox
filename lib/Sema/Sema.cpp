@@ -28,7 +28,8 @@ bool Sema::checkOperatorType(tok::TokenKind OpKind, TypeDecl *Ty) {
    return false;
 }
 
-void Sema::enterScope(Decl *D) {
+// We can enter in scope of function or block
+void Sema::enterScope(Stmt *D) {
    CurScope = new Scope(CurScope);
    CurDecl = D;
 }
@@ -39,7 +40,12 @@ void Sema::leaveScope() {
    Scope *Parent = CurScope->getParent();
    delete CurScope;
    CurScope = Parent;
-   CurDecl = CurDecl->getEnclosingDecl();
+   if (auto *D = dyn_cast<Decl>(CurDecl)) {
+      CurDecl = D->getEnclosingDecl();
+   }
+   else if (auto *B = dyn_cast<BlockStmt>(CurDecl)) {
+      CurDecl = B->getEnclosingDecl();
+   }
 }
 
 Sema::Sema()
@@ -50,6 +56,60 @@ Sema::Sema()
    FalseLiteral = new BoolLiteral(false, BoolType);
    CurScope->insert(DoubleType);
    CurScope->insert(BoolType);
+}
+
+void Sema::actOnIfStmt(StmtList &Stmts, Expr *Cond, StmtList &IfElseStmts) {
+   IfStmt *Stm = nullptr;
+   if (IfElseStmts.size() == 1) {
+      if (auto *B1 = dyn_cast<BlockStmt>(IfElseStmts.front()))
+         Stm = new IfStmt(Cond, *B1);
+      else
+         llvm_unreachable("incorrect stmt class for IfStmts");
+   }
+   else if (IfElseStmts.size() == 2) {
+      auto *B1 = dyn_cast<BlockStmt>(IfElseStmts.front());
+      auto *B2 = dyn_cast<BlockStmt>(IfElseStmts.back());
+      if (B1 && B2) 
+         Stm = new IfStmt(Cond, *B1, *B2);
+      else
+         llvm_unreachable("incorrect stmt class for IfStmts or ElseStmts"); 
+   }
+   else
+      llvm_unreachable("incorrect number of stmts for IfStmt");
+
+   Stmts.push_back(Stm);
+}
+
+void Sema::actOnWhileStmt(StmtList &Stmts, Expr *Cond, StmtList &WhileStmts) {
+   if (WhileStmts.size() != 1)
+      llvm_unreachable("incorrect number of stmts for WhileStmt");
+
+   WhileStmt *Stm = nullptr;
+   if (auto *B = dyn_cast<BlockStmt>(WhileStmts.front())) 
+      Stm = new WhileStmt(Cond, *B);
+   else 
+      llvm_unreachable("incorrect stmt class for WhileStmts");  
+   Stmts.push_back(Stm);
+}
+
+void Sema::actOnReturnStmt(StmtList &Stmts, Expr *E) {
+   auto *Stm = new ReturnStmt(E);
+   Stmts.push_back(Stm);
+}
+
+BlockStmt *Sema::actOnBlockStmt(StmtList &Stmts) {
+   auto *Stm = new BlockStmt(CurDecl);
+   Stmts.push_back(Stm);
+   return Stm;
+}
+
+void Sema::actOnBlockStmt(BlockStmt *Block, StmtList &BlockStmts) {
+   Block->setStmts(BlockStmts);
+}
+
+void Sema::actOnExprStmt(StmtList &Stmts, Expr *E) {
+   ExprStmt *ES = new ExprStmt(E);
+   Stmts.push_back(ES);
 }
 
 FunctionDecl *Sema::actOnFunctionDecl(SMLoc Loc, StringRef Name) {
@@ -68,13 +128,12 @@ void Sema::actOnFunctionParamList(FunctionDecl *FunDecl, ParameterList &Params, 
       FunDecl->setRetType(CastedRetTy);
 }
 
-void Sema::actOnFunctionBlock(DeclList &Decls, FunctionDecl *FunDecl, DeclList &FunDecls, StmtList &FunStmts) {
-   FunDecl->setDecls(FunDecls);
+void Sema::actOnFunctionBlock(StmtList &Decls, FunctionDecl *FunDecl, StmtList &FunStmts) {
    FunDecl->setStmts(FunStmts);
    Decls.push_back(FunDecl);
 }
 
-void Sema::actOnFunctionParameters(ParameterList &Params, IdentList &ParIds, DeclList &ParTypes) {
+void Sema::actOnFunctionParameters(ParameterList &Params, IdentList &ParIds, StmtList &ParTypes) {
    if (!CurScope)
       llvm_unreachable("current scope isn't set");
    assert(ParIds.size() == ParTypes.size());
@@ -96,7 +155,7 @@ void Sema::actOnFunctionParameters(ParameterList &Params, IdentList &ParIds, Dec
 
 }
 
-Decl *Sema::actOnNameLookup(Decl *Prev, SMLoc Loc, StringRef Name) {
+Decl *Sema::actOnNameLookup(Stmt *Prev, SMLoc Loc, StringRef Name) {
    if (!Prev) {
       if (Decl *D = CurScope->lookup(Name))
          return D;
@@ -104,7 +163,7 @@ Decl *Sema::actOnNameLookup(Decl *Prev, SMLoc Loc, StringRef Name) {
    return nullptr;
 }
 
-void Sema::actOnVariableDecl(DeclList &Decls, Identifier Id, Decl *D) {
+void Sema::actOnVariableDecl(StmtList &Decls, Identifier Id, Decl *D) {
    if (!CurScope)
       llvm_unreachable("no current scope");
    

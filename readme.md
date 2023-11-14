@@ -68,6 +68,16 @@ returnStmt     → "return" expression? ";" ;
 whileStmt      → "while" "(" expression ")" statement ;
 block          → "{" declaration* "}" ;
 
+unary          → ( "!" | "-" ) unary | call ;
+call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
+primary        → "true" | "false" | "nil" | "this"
+               | NUMBER | STRING | IDENTIFIER | "(" expression ")"
+               | "super" "." IDENTIFIER ;
+
+function       → IDENTIFIER "(" parameters? ")" : type block ;
+parameters     → IDENTIFIER : type ( "," IDENTIFIER : type )* ;
+arguments      → expression ( "," expression )* ;
+
 expression     → assignment ;
 
 assignment     → ( call "." )? IDENTIFIER "=" assignment
@@ -80,15 +90,6 @@ comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 term           → factor ( ( "-" | "+" ) factor )* ;
 factor         → unary ( ( "/" | "*" ) unary )* ;
 
-unary          → ( "!" | "-" ) unary | call ;
-call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
-primary        → "true" | "false" | "nil" | "this"
-               | NUMBER | STRING | IDENTIFIER | "(" expression ")"
-               | "super" "." IDENTIFIER ;
-
-function       → IDENTIFIER "(" parameters? ")" : type block ;
-parameters     → IDENTIFIER : type ( "," IDENTIFIER : type )* ;
-arguments      → expression ( "," expression )* ;
 
 NUMBER         → DIGIT+ ( "." DIGIT+ )? ;
 STRING         → "\"" <any char except "\"">* "\"" ;

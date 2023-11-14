@@ -30,14 +30,16 @@ public:
    OperatorPrec getBinOperatorPrec();
    OperatorPrec getUnOperatorPrec();
 
+   bool validStmtDelimiter(StmtList &Stmts);
+
    bool parseProgram();
-   bool parseDecl(DeclList &Decls);
-   bool parseVariableDecl(DeclList &Decls);
+   bool parseDecl(StmtList &Decls);
+   bool parseVariableDecl(StmtList &Decls);
    bool parseTypeIdent(Decl *&D);
-   bool parseFunctionParameter(IdentList &ParIds, DeclList &ParTypes);
+   bool parseFunctionParameter(IdentList &ParIds, StmtList &ParTypes);
    bool parseFunctionParameterList(ParameterList &Params);
-   bool parseBlock(DeclList &Decls, StmtList &Stmts);
-   bool parseFunctionDecl(DeclList &Decls);
+   bool parseBlock(StmtList &Decls, StmtList &Stmts);
+   bool parseFunctionDecl(StmtList &Decls);
    bool parseExprList(ExprList &Exprs);
    bool parseIdentifierExpr(Expr *&E);
    bool parseStringLiteral(Expr *&E);
@@ -48,6 +50,15 @@ public:
    bool parseExpr(Expr *&E);
    bool parseInfixExpr(OperatorPrec LeftPrec, Expr *&Left);
    bool parsePrefixExpr(Expr *&E);
+   
+   bool parseStmtList(StmtList &Stmts);
+   bool parseStmt(StmtList &Stmts);
+   bool parseIfStmt(StmtList &Stmts);
+   bool parseWhileStmt(StmtList &Stmts);
+   bool parseReturnStmt(StmtList &Stmts);
+   bool parseForStmt(StmtList &Stmts);
+   bool parseExprStmt(StmtList &Stmts);
+   bool parseBlock(StmtList &Stmts);
 };
 
 } // namespace llox

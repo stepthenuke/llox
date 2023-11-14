@@ -58,6 +58,14 @@ Sema::Sema()
    CurScope->insert(BoolType);
 }
 
+CompilationUnitDecl *Sema::actOnCompilationUnit(StringRef Name) {
+   return new CompilationUnitDecl(CurDecl, SMLoc(), Name);
+}
+
+void Sema::actOnCompilationUnit(CompilationUnitDecl *CompUnit, StmtList Stmts) {
+   CompUnit->setStmts(Stmts);
+}
+
 void Sema::actOnIfStmt(StmtList &Stmts, Expr *Cond, StmtList &IfElseStmts) {
    IfStmt *Stm = nullptr;
    if (IfElseStmts.size() == 1) {

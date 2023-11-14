@@ -21,6 +21,8 @@ class Parser {
 public:
    Parser(Lexer &L, Sema &S);
 
+   CompilationUnitDecl *parse();
+
 public:
    void nextToken();
 
@@ -32,7 +34,7 @@ public:
 
    bool validStmtDelimiter(StmtList &Stmts);
 
-   bool parseProgram();
+   bool parseCompilationUnit(CompilationUnitDecl *&CompUnit);
    bool parseDecl(StmtList &Decls);
    bool parseVariableDecl(StmtList &Decls);
    bool parseTypeIdent(Decl *&D);

@@ -71,6 +71,7 @@ public:
       DK_Var,
       DK_Func,
       DK_Param,
+      DK_CompUnit,
       DK_GlobalType,
       DK_TypeEnd,
       DK_End
@@ -104,7 +105,7 @@ public:
       Stmts = SL;
    }
 
-   const StmtList &getStmts() {
+   const StmtList &getStmts() const {
       return Stmts;
    }
 
@@ -230,6 +231,29 @@ public:
    static bool classof(const Stmt *S) {
       return S->getKind() >= DK_Var &&
              S->getKind() <= DK_End;
+   }
+};
+
+class CompilationUnitDecl : public Decl {
+   StmtList Stmts;
+
+public:
+   CompilationUnitDecl(Stmt *EnclosingDecl, SMLoc Loc, StringRef Name)
+      : Decl(DK_CompUnit, EnclosingDecl, Loc, Name) {}
+
+   CompilationUnitDecl(Stmt *EnclosingDecl, SMLoc Loc, StringRef Name, StmtList &Stmts)
+      : Decl(DK_CompUnit, EnclosingDecl, Loc, Name), Stmts(Stmts) {}
+
+   const StmtList &getStmts() const {
+      return Stmts;
+   }
+   void setStmts(const StmtList &SL) {
+      Stmts = SL;
+   }
+
+public:
+   static bool classof(const Stmt* D) {
+      return D->getKind() == DK_CompUnit;
    }
 };
 
@@ -464,11 +488,11 @@ public:
    FunctionCallExpr(FunctionDecl *Func, ExprList Params)
       : Expr(EK_Func, Func->getRetType()), Func(Func), Params(Params) {}
 
-   FunctionDecl *getDecl() {
+   FunctionDecl *getFunctionDecl() const {
       return Func;
    }
 
-   const ExprList &getParams() {
+   const ExprList &getParams() const {
       return Params;
    }
 

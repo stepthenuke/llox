@@ -34,8 +34,23 @@ op::OperatorPrec Parser::getUnOperatorPrec() {
    return op::getUnaryPrec(CurTok.getKind());
 }
 
-bool Parser::parseProgram() {
-   return true;
+CompilationUnitDecl *Parser::parse() {
+   CompilationUnitDecl *CompUnit = nullptr;
+   parseCompilationUnit(CompUnit);
+   return CompUnit;
+}
+
+bool Parser::parseCompilationUnit(CompilationUnitDecl *&CompUnit) {
+   Sem.enterScope(CompUnit);
+   CompUnit = Sem.actOnCompilationUnit("TODO: compilation unit names");
+   
+   StmtList Stmts;
+   if (parseStmtList(Stmts))
+      return true;
+
+   Sem.actOnCompilationUnit(CompUnit, Stmts);
+   Sem.leaveScope();
+   return false;
 }
 
 bool Parser::validStmtDelimiter(StmtList &Stmts) {
@@ -49,7 +64,7 @@ bool Parser::parseStmtList(StmtList &Stmts) {
    if (parseStmt(Stmts))
       return true;
 
-   while (validStmtDelimiter(Stmts)) {
+   while (CurTok.isNot(tok::eof) && validStmtDelimiter(Stmts)) {
       if (parseStmt(Stmts))
          return true;
    }
@@ -405,7 +420,7 @@ bool Parser::parseExpr(Expr *&E) {
 
 bool Parser::parseInfixExpr(OperatorPrec LeftPrec, Expr *&Left) {
    while (true) {
-      if (CurTok.is(tok::comma)) {
+      if (CurTok.isOneOf({tok::comma, tok::semicolon, tok::r_paren})) {
          return false;
       }
 
@@ -416,7 +431,7 @@ bool Parser::parseInfixExpr(OperatorPrec LeftPrec, Expr *&Left) {
          return false;
 
       nextToken(); // eat BinOp
-
+      
       // there can be expr: 10 + -1 -> parsing + -> we find unary expr
       Expr *Right = nullptr;
       if (parsePrefixExpr(Right))
@@ -438,9 +453,8 @@ bool Parser::parseInfixExpr(OperatorPrec LeftPrec, Expr *&Left) {
 }
 
 bool Parser::parsePrefixExpr(Expr *&E) {
-   if (!op::isUnaryOp(CurTok.getKind())) {
+   if (!op::isUnaryOp(CurTok.getKind()))
       return parsePrimary(E);
-   }
 
    OperatorInfo UnOp(CurTok.getLocation(), CurTok.getKind());
    nextToken();

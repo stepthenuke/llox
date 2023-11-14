@@ -23,6 +23,7 @@ class Sema {
    BoolLiteral *FalseLiteral;
 
    bool checkOperatorType(tok::TokenKind OpKind, TypeDecl *Ty);
+
 public:
    void enterScope(Stmt *D);
    void leaveScope();
@@ -30,6 +31,9 @@ public:
 public:
    Sema();
 
+   CompilationUnitDecl *actOnCompilationUnit(StringRef Name);
+
+   void actOnCompilationUnit(CompilationUnitDecl *CompUnit, StmtList Stmts);
    void actOnIfStmt(StmtList &Stmts, Expr *Cond, StmtList &IfElseStmts);
    void actOnWhileStmt(StmtList &Stmts, Expr *Cond, StmtList &WhileStmts);
    void actOnReturnStmt(StmtList &Stmts, Expr *E);

@@ -38,6 +38,7 @@ void Lexer::getNextToken(Token &Tok) {
    // if we came to end -> it's eof
    if (!*BufPtr) {
       Tok.setKind(tok::eof);
+      llvm::outs() << ": eof\n";
       return;
    }
 
@@ -148,7 +149,7 @@ void Lexer::setNumber(Token &Tok) {
       return;
    }
    llvm_unreachable("not a valid number");
-
+ 
 }
 
 void Lexer::setIdentifier(Token &Tok) {

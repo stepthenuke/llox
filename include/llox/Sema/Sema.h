@@ -40,6 +40,7 @@ public:
    BlockStmt *actOnBlockStmt(StmtList &Stmts);
    void actOnBlockStmt(BlockStmt *Block, StmtList &BlockStmts);
    void actOnExprStmt(StmtList &Stmts, Expr *E);
+   void actOnAssignmentStmt(StmtList &Decls, Expr *E);
 
    FunctionDecl *actOnFunctionDecl(SMLoc Loc, StringRef Name);
    void actOnFunctionParamList(FunctionDecl *FunDecl, ParameterList &Params, Decl *RetTy);
@@ -53,7 +54,7 @@ public:
    Expr *actOnPrefixExpr(Expr *E, const OperatorInfo &Op);
    void checkFunctionParameterTypes(const ParameterList &Params, const ExprList &Exprs);
    Expr *actOnFunctionCallExpr(Identifier &FunId, ExprList &ParamExprs);
-   Expr *actOnVariableExpr(Identifier &Id);
+   Expr *actOnObjectExpr(Identifier &Id);
 };
 
 } // namespace llox

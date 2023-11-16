@@ -38,6 +38,7 @@ static void print(const ParameterList &PL);
 static void print(const DeclList &DL);
 static void print(const StmtList &SL);
 static void print(const ExprList &EL);
+static void print(const Stmt *S);
 
 static void print(const Expr *E) {
    if (!E) return;
@@ -74,6 +75,10 @@ static void print(const Expr *E) {
       print(Exp->getParams());
       decreaseIndentation();
    }
+   else if (auto *Exp = dyn_cast<ObjectExpr>(E)) {
+      llvm::outs() << "ObjectExpr ";
+      print(Exp->getObjectDecl());
+   }
 }
 
 static void print(const Stmt *S) {
@@ -81,7 +86,13 @@ static void print(const Stmt *S) {
 
    printSpaces();
 
-   if (auto Stm = dyn_cast<ExprStmt>(S)) {
+   if (auto Stm = dyn_cast<CompilationUnitDecl>(S)) {
+      llvm::outs() << "CompUnit\n";
+      printLine();
+      print(Stm->getStmts());
+      printLine();
+   }
+   else if (auto Stm = dyn_cast<ExprStmt>(S)) {
       print(Stm->getExpr());
    }
    else if (auto Stm = dyn_cast<BlockStmt>(S)) {
@@ -98,8 +109,10 @@ static void print(const Stmt *S) {
       printLine();
       increaseIndentation();
       print(&Stm->getIfStmts());
+      llvm::outs() << "\n";
       print(&Stm->getElseStmts());
       decreaseIndentation();
+      llvm::outs() << "\n";
    }
    else if (auto Stm = dyn_cast<WhileStmt>(S)) {
       llvm::outs() << "WhileStmt\n";
@@ -110,6 +123,7 @@ static void print(const Stmt *S) {
       increaseIndentation();
       print(&Stm->getWhileStmts());
       decreaseIndentation();
+      llvm::outs() << "\n";
    }
    else if (auto Stm = dyn_cast<ReturnStmt>(S)) {
       llvm::outs() << "ReturnStmt\n";
@@ -136,11 +150,19 @@ static void print(const Stmt *S) {
       increaseIndentation();
       print(Stm->getStmts());
       decreaseIndentation();
+      llvm::outs() << "\n";
    }
    else if (auto Stm = dyn_cast<GlobalTypeDecl>(S)) {
       llvm::outs() << "GlobalTypeDecl" << Stm->getName() << "\n";
    }
-
+   else if (auto Stm = dyn_cast<AssignmentStmt>(S)) {
+      llvm::outs() << "AssignmentStmt \n";
+      increaseIndentation();
+      print(Stm->getObject());
+      printLine();
+      print(Stm->getExpr());
+      decreaseIndentation();
+   }
 }
 
 static void print(const ParameterList &PL) {

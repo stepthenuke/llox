@@ -40,10 +40,10 @@ void Sema::leaveScope() {
    Scope *Parent = CurScope->getParent();
    delete CurScope;
    CurScope = Parent;
-   if (auto *D = dyn_cast<Decl>(CurDecl)) {
+   if (auto *D = dyn_cast_or_null<Decl>(CurDecl)) {
       CurDecl = D->getEnclosingDecl();
    }
-   else if (auto *B = dyn_cast<BlockStmt>(CurDecl)) {
+   else if (auto *B = dyn_cast_or_null<BlockStmt>(CurDecl)) {
       CurDecl = B->getEnclosingDecl();
    }
 }
@@ -59,7 +59,10 @@ Sema::Sema()
 }
 
 CompilationUnitDecl *Sema::actOnCompilationUnit(StringRef Name) {
-   return new CompilationUnitDecl(CurDecl, SMLoc(), Name);
+   CompilationUnitDecl *CU = new CompilationUnitDecl(CurDecl, SMLoc(), Name);
+   if (!CurScope->insert(CU))
+      llvm_unreachable("Same name for comp unit");
+   return CU;
 }
 
 void Sema::actOnCompilationUnit(CompilationUnitDecl *CompUnit, StmtList Stmts) {
@@ -152,22 +155,20 @@ void Sema::actOnFunctionParameters(ParameterList &Params, IdentList &ParIds, Stm
          SMLoc Loc = Idx->first;
          StringRef Name = Idx->second;
          ParameterDecl *ParDecl = new ParameterDecl(CurDecl, Loc, Name, Ty, true);
-         if (CurScope->insert(ParDecl))
+         if (CurScope->insert(ParDecl)) {
             Params.push_back(ParDecl);
+         }
          else
             llvm_unreachable("such parameter already exists");
       }
       else
          llvm_unreachable("not a type for parameter");
    }
-
 }
 
 Decl *Sema::actOnNameLookup(Stmt *Prev, SMLoc Loc, StringRef Name) {
-   if (!Prev) {
-      if (Decl *D = CurScope->lookup(Name))
-         return D;
-   }
+   if (Decl *D = CurScope->lookup(Name))
+      return D;
    return nullptr;
 }
 
@@ -186,6 +187,20 @@ void Sema::actOnVariableDecl(StmtList &Decls, Identifier Id, Decl *D) {
    }
    else 
       llvm_unreachable("no such type in var decl");
+}
+
+void Sema::actOnAssignmentStmt(StmtList &Decls, Expr *E) {
+   if (!CurScope)
+      llvm_unreachable("no current scope");
+
+   if (auto *V = dyn_cast<VariableDecl>(Decls.back())) {
+      if (V->getType() != E->getType())
+         llvm_unreachable("incompatible types for assignment");
+      AssignmentStmt *AssigStmt = new AssignmentStmt(V, E);
+      Decls.push_back(AssigStmt);
+   }
+   else 
+      llvm_unreachable("no such variable"); 
 }
 
 Expr *Sema::actOnDoubleLiteral(SMLoc Loc, StringRef Literal) {
@@ -243,20 +258,23 @@ void Sema::checkFunctionParameterTypes(const ParameterList &Params, const ExprLi
 
 Expr *Sema::actOnFunctionCallExpr(Identifier &FunId, ExprList &ParamExprs) {
    Decl *D = actOnNameLookup(CurDecl, FunId.first, FunId.second);
-   D = new FunctionDecl(nullptr, SMLoc(), StringRef("TEST_FUNC"));
-   if (auto *F = dyn_cast<FunctionDecl>(D)) {
-      // checkFunctionParameterTypes(F->getParams(), ParamExprs);
-      F->setRetType(DoubleType); 
+   if (auto *F = dyn_cast_or_null<FunctionDecl>(D)) {
+      checkFunctionParameterTypes(F->getParams(), ParamExprs);
       return new FunctionCallExpr(F, ParamExprs);
-   }
-   llvm_unreachable("no call function");
+   } 
+   llvm_unreachable("no such function for call");
    return nullptr;
 }
 
-Expr *Sema::actOnVariableExpr(Identifier &Id) {
+Expr *Sema::actOnObjectExpr(Identifier &Id) {
    Decl *D = actOnNameLookup(CurDecl, Id.first, Id.second);
-   // what're we doing here?
-   return new DoubleLiteral(Id.first,  llvm::APFloat(llvm::APFloat::IEEEdouble(), 228), DoubleType);
+   if (auto *V = dyn_cast_or_null<VariableDecl>(D)) {
+      return new ObjectExpr(V);
+   }
+   else if (auto *P = dyn_cast_or_null<ParameterDecl>(D)) {
+      return new ObjectExpr(P);
+   }
+   llvm_unreachable("object (variable or parameter) is not declared");
    return nullptr;
 }
 

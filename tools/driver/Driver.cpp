@@ -45,10 +45,6 @@ int main(int argc_, char **argv_) {
       //    Lex.getNextToken(Tok);
       // }
 
-      StmtList Stmts;
-      llvm::outs() << Par.parseStmtList(Stmts) << "\n";
-      print(Stmts);
-
       // Expr *E = nullptr;
       // llvm::outs() << Par.parseExpr(E) << "\n";
       // print(E);
@@ -57,6 +53,10 @@ int main(int argc_, char **argv_) {
       // while (!Par.parseDecl(Decls))
       //    llvm::outs() << 0 << " " << "\n";
       // printDeclList(Decls);
+
+
+      CompilationUnitDecl *CompUnit = Par.parse();
+      print(CompUnit);
    }
 
    return 0;

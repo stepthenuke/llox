@@ -41,8 +41,8 @@ CompilationUnitDecl *Parser::parse() {
 }
 
 bool Parser::parseCompilationUnit(CompilationUnitDecl *&CompUnit) {
+   CompUnit = Sem.actOnCompilationUnit("COMPUNIT");
    Sem.enterScope(CompUnit);
-   CompUnit = Sem.actOnCompilationUnit("TODO: compilation unit names");
    
    StmtList Stmts;
    if (parseStmtList(Stmts))
@@ -219,6 +219,14 @@ bool Parser::parseVariableDecl(StmtList &Decls) {
 
    Sem.actOnVariableDecl(Decls, VarId, D);
    
+   if (CurTok.is(tok::equal)) {
+      nextToken();
+      Expr *E;
+      if (parseExpr(E))
+         return true;
+      Sem.actOnAssignmentStmt(Decls, E);
+   }
+
    if (consumeToken(tok::semicolon))
       return true;
 
@@ -343,7 +351,7 @@ bool Parser::parseIdentifierExpr(Expr *&E) {
    Identifier Id (CurTok.getLocation(), CurTok.getIdentifier());
    nextToken();
    if (CurTok.isNot(tok::l_paren)) {
-      E = Sem.actOnVariableExpr(Id);
+      E = Sem.actOnObjectExpr(Id);
       return false;
    }
    nextToken();

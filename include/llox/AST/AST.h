@@ -63,6 +63,7 @@ using IdentList = std::vector<Identifier>;
 class Stmt {
 public:
    enum StmtKind {
+      SK_Assign,
       SK_Expr,
       SK_If,
       SK_While,
@@ -367,6 +368,7 @@ public:
       EK_Bool,
       EK_Infix,
       EK_Prefix,
+      EK_Obj,
       EK_Func
    };
 
@@ -500,6 +502,52 @@ public:
    static bool classof(const Expr *E) {
       return E->getKind() == EK_Func;
    }
+};
+
+class ObjectExpr : public Expr {
+   Decl *Obj;
+
+public:
+   ObjectExpr(ParameterDecl *Obj) 
+      : Expr(EK_Obj, Obj->getType()), Obj(Obj) {}
+   
+   ObjectExpr(VariableDecl *Obj) 
+      : Expr(EK_Obj, Obj->getType()), Obj(Obj) {}
+
+   const Decl *getObjectDecl() const {
+      return Obj;
+   }
+
+public:
+   static bool classof(const Expr *E) {
+      return E->getKind() == EK_Obj;
+   } 
+};
+
+class AssignmentStmt : public Stmt {
+   ObjectExpr *Obj;
+   Expr *E;
+
+public:
+   AssignmentStmt(ParameterDecl *Obj, Expr *E) 
+      : Stmt(SK_Assign), Obj(new ObjectExpr(Obj)), E(E) {}
+      
+   AssignmentStmt(VariableDecl *Obj, Expr *E) 
+      : Stmt(SK_Assign), Obj(new ObjectExpr(Obj)), E(E) {}
+
+   const ObjectExpr *getObject() const {
+      return Obj;
+   }
+   
+   const Expr *getExpr() const {
+      return E;
+   }
+
+public:
+   static bool classof(const Stmt *S) {
+      return S->getKind() == SK_Assign;
+   }
+
 };
 
 } //namespace llox

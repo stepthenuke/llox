@@ -14,8 +14,9 @@ Decl *Scope::lookup(StringRef Name) {
    Scope *S = this;
    while (S) {
       const auto I = S->Symbols.find(Name);
-      if (I != S->Symbols.end())
+      if (I != S->Symbols.end()) {
          return I->second;
+      }
       S = S->getParent();
    }
    return nullptr;

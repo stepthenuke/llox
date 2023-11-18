@@ -40,8 +40,9 @@ public:
    BlockStmt *actOnBlockStmt(StmtList &Stmts);
    void actOnBlockStmt(BlockStmt *Block, StmtList &BlockStmts);
    void actOnExprStmt(StmtList &Stmts, Expr *E);
-   void actOnAssignmentStmt(StmtList &Decls, Expr *E);
+   void *actOnAssignmentInit(StmtList &Decls, Expr *E);
 
+   Expr *actOnAssignmentExpr(Expr *Left, Expr *Right);
    FunctionDecl *actOnFunctionDecl(SMLoc Loc, StringRef Name);
    void actOnFunctionParamList(FunctionDecl *FunDecl, ParameterList &Params, Decl *RetTy);
    void actOnFunctionBlock(StmtList &Decls, FunctionDecl *FunDecl, StmtList &FunStmts);

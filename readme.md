@@ -7,7 +7,7 @@ Lox lang is a lang from Crafting Interpreters.
 2. Parser - minimal done
 3. Sema - for exprs, decls
 4. AST Printer - crutchy but enough
-5. Error Printer - TOP PRIORITY
+5. Error Printer - after basic codegen ready
 ------------------------
 3. Translate language to IR - .
 4. ... 
@@ -97,98 +97,3 @@ IDENTIFIER     → ALPHA ( ALPHA | DIGIT )* ;
 ALPHA          → "a" ... "z" | "A" ... "Z" | "_" ;
 DIGIT          → "0" ... "9" ;
 ```
-
-Current Progress:
-```
-foo(1, 2);
-
-if (5 + foo(1, 2) * 5) {
-   5 + foo(1, 2);
-}
-else {
-   return 10;
-}
-
-foo((1 + -2) * 5 - 100 * (1 / 2 + -1), 2);
-343 + 123;
-
-434 + 34 * (3 * 4 - 34 / 23);
-
-fun foo(a: double, b: double) : double {
-   var c : double;
-   343 * 13 - 1 / 34;
-}
-var a : double = 50;
-
-GOES TO:
-------------------------------
-
-FunctionCallExpr TEST_FUNC <double> 
-   DoubleLiteral 1
-   DoubleLiteral 2
-IfStmt
-   InfixExpr <double> plus:
-      DoubleLiteral 5
-      InfixExpr <double> star:
-         FunctionCallExpr TEST_FUNC <double> 
-            DoubleLiteral 1
-            DoubleLiteral 2
-         DoubleLiteral 5
-------------------------------
-   Block
-            InfixExpr <double> plus:
-         DoubleLiteral 5
-         FunctionCallExpr TEST_FUNC <double> 
-            DoubleLiteral 1
-            DoubleLiteral 2
-   Block
-      ReturnStmt
-         DoubleLiteral 10
-      FunctionCallExpr TEST_FUNC <double> 
-   InfixExpr <double> minus:
-      InfixExpr <double> star:
-         InfixExpr <double> plus:
-            DoubleLiteral 1
-            PrefixExpr <double> minus:
-               DoubleLiteral 2
-         DoubleLiteral 5
-      InfixExpr <double> star:
-         DoubleLiteral 100
-         InfixExpr <double> plus:
-            InfixExpr <double> slash:
-               DoubleLiteral 1
-               DoubleLiteral 2
-            PrefixExpr <double> minus:
-               DoubleLiteral 1
-   DoubleLiteral 2
-InfixExpr <double> plus:
-   DoubleLiteral 343
-   DoubleLiteral 123
-InfixExpr <double> plus:
-   DoubleLiteral 434
-   InfixExpr <double> star:
-      DoubleLiteral 34
-      InfixExpr <double> minus:
-         InfixExpr <double> star:
-            DoubleLiteral 3
-            DoubleLiteral 4
-         InfixExpr <double> slash:
-            DoubleLiteral 34
-            DoubleLiteral 23
-FunctionDecl foo <double> 
-------------------------------
-   ParameterDecl a <double> 
-   ParameterDecl b <double> 
-------------------------------
-   Block
-      VariableDecl c <double> 
-            InfixExpr <double> minus:
-         InfixExpr <double> star:
-            DoubleLiteral 343
-            DoubleLiteral 13
-         InfixExpr <double> slash:
-            DoubleLiteral 1
-            DoubleLiteral 34
-VariableDecl a <double>
-```
-

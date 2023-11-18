@@ -79,6 +79,14 @@ static void print(const Expr *E) {
       llvm::outs() << "ObjectExpr ";
       print(Exp->getObjectDecl());
    }
+   else if (auto *Exp = dyn_cast<AssignmentExpr>(E)) {
+      llvm::outs() << "AssignmentExpr \n";
+      increaseIndentation();
+      print(Exp->getObject());
+      printLine();
+      print(Exp->getExpr());
+      decreaseIndentation();
+   }
 }
 
 static void print(const Stmt *S) {
@@ -86,22 +94,22 @@ static void print(const Stmt *S) {
 
    printSpaces();
 
-   if (auto Stm = dyn_cast<CompilationUnitDecl>(S)) {
+   if (auto *Stm = dyn_cast<CompilationUnitDecl>(S)) {
       llvm::outs() << "CompUnit\n";
       printLine();
       print(Stm->getStmts());
       printLine();
    }
-   else if (auto Stm = dyn_cast<ExprStmt>(S)) {
+   else if (auto *Stm = dyn_cast<ExprStmt>(S)) {
       print(Stm->getExpr());
    }
-   else if (auto Stm = dyn_cast<BlockStmt>(S)) {
+   else if (auto *Stm = dyn_cast<BlockStmt>(S)) {
       llvm::outs() << "Block\n";
       increaseIndentation();
       print(Stm->getStmts());
       decreaseIndentation();
    }
-   else if (auto Stm = dyn_cast<IfStmt>(S)) {
+   else if (auto *Stm = dyn_cast<IfStmt>(S)) {
       llvm::outs() << "IfStmt\n";
       increaseIndentation();
       print(Stm->getCond());
@@ -114,7 +122,7 @@ static void print(const Stmt *S) {
       decreaseIndentation();
       llvm::outs() << "\n";
    }
-   else if (auto Stm = dyn_cast<WhileStmt>(S)) {
+   else if (auto *Stm = dyn_cast<WhileStmt>(S)) {
       llvm::outs() << "WhileStmt\n";
       increaseIndentation();
       print(Stm->getCond());
@@ -125,21 +133,21 @@ static void print(const Stmt *S) {
       decreaseIndentation();
       llvm::outs() << "\n";
    }
-   else if (auto Stm = dyn_cast<ReturnStmt>(S)) {
+   else if (auto *Stm = dyn_cast<ReturnStmt>(S)) {
       llvm::outs() << "ReturnStmt\n";
       increaseIndentation();
       print(Stm->getRetVal());
       decreaseIndentation();
    }
-   else if (auto Stm = dyn_cast<VariableDecl>(S)) {
+   else if (auto *Stm = dyn_cast<VariableDecl>(S)) {
       llvm::outs() << "VariableDecl " << Stm->getName() << " <" 
          << Stm->getType()->getName() << "> \n";
    }
-   else if (auto Stm = dyn_cast<ParameterDecl>(S)) {
+   else if (auto *Stm = dyn_cast<ParameterDecl>(S)) {
       llvm::outs() << "ParameterDecl " << Stm->getName() << " <" 
          << Stm->getType()->getName() << "> \n"; 
    }
-   else if (auto Stm = dyn_cast<FunctionDecl>(S)) {
+   else if (auto *Stm = dyn_cast<FunctionDecl>(S)) {
       llvm::outs() << "FunctionDecl " << Stm->getName() << " <" 
          << Stm->getRetType()->getName() << "> \n";
       printLine();
@@ -152,17 +160,10 @@ static void print(const Stmt *S) {
       decreaseIndentation();
       llvm::outs() << "\n";
    }
-   else if (auto Stm = dyn_cast<GlobalTypeDecl>(S)) {
+   else if (auto *Stm = dyn_cast<GlobalTypeDecl>(S)) {
       llvm::outs() << "GlobalTypeDecl" << Stm->getName() << "\n";
    }
-   else if (auto Stm = dyn_cast<AssignmentStmt>(S)) {
-      llvm::outs() << "AssignmentStmt \n";
-      increaseIndentation();
-      print(Stm->getObject());
-      printLine();
-      print(Stm->getExpr());
-      decreaseIndentation();
-   }
+
 }
 
 static void print(const ParameterList &PL) {

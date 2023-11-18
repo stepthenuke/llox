@@ -32,6 +32,7 @@ class Lexer {
 public:
    Lexer(SourceMgr &SM);
    void getNextToken(Token &Tok);
+   Token peek(int n);
    StringRef getBuffer() const;
 
 private:

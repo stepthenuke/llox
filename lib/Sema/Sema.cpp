@@ -189,20 +189,6 @@ void Sema::actOnVariableDecl(StmtList &Decls, Identifier Id, Decl *D) {
       llvm_unreachable("no such type in var decl");
 }
 
-void Sema::actOnAssignmentStmt(StmtList &Decls, Expr *E) {
-   if (!CurScope)
-      llvm_unreachable("no current scope");
-
-   if (auto *V = dyn_cast<VariableDecl>(Decls.back())) {
-      if (V->getType() != E->getType())
-         llvm_unreachable("incompatible types for assignment");
-      AssignmentStmt *AssigStmt = new AssignmentStmt(V, E);
-      Decls.push_back(AssigStmt);
-   }
-   else 
-      llvm_unreachable("no such variable"); 
-}
-
 Expr *Sema::actOnDoubleLiteral(SMLoc Loc, StringRef Literal) {
    return new DoubleLiteral(Loc, llvm::APFloat(llvm::APFloat::IEEEdouble(), Literal), DoubleType);
 }
@@ -212,6 +198,25 @@ Expr *Sema::actOnBoolLiteral(tok::TokenKind K) {
       return TrueLiteral;
    else
       return FalseLiteral;
+}
+
+Expr *Sema::actOnAssignmentExpr(Expr *Left, Expr *Right) {
+   if (auto *O = dyn_cast<ObjectExpr>(Left)) {
+      return new AssignmentExpr(O, Right);
+   }
+   else
+      llvm_unreachable("lhs of = operator is not assignable");
+}
+
+void *Sema::actOnAssignmentInit(StmtList &Decls, Expr *E) {
+   if (auto *V = dyn_cast<VariableDecl>(Decls.back())) {
+      if (V->getType() != E->getType())
+         llvm_unreachable("incompatible types for assignment");
+      AssignmentExpr *AssignExpr = new AssignmentExpr(V, E);
+      actOnExprStmt(Decls, AssignExpr);
+   }
+   else 
+      llvm_unreachable("no such variable"); 
 }
 
 Expr *Sema::actOnInfixExpr(Expr *Left, Expr *Right, const OperatorInfo &Op) {
@@ -229,6 +234,11 @@ Expr *Sema::actOnInfixExpr(Expr *Left, Expr *Right, const OperatorInfo &Op) {
 
    bool RetTypeIsBool = op::isLogicalBinOp(Op.getKind());
    Ty = RetTypeIsBool ? BoolType : Ty;
+
+   if (Op.getKind() == tok::equal) {
+      return actOnAssignmentExpr(Left, Right);
+   }
+
    return new InfixExpr(Left, Right, Op, Ty);
 }
 

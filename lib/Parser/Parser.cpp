@@ -10,6 +10,13 @@ void Parser::nextToken() {
    Lex.getNextToken(CurTok);
 }
 
+bool Parser::peekToken(tok::TokenKind Kind, int n = 1) {
+   Token PeekedToken = Lex.peek(n);
+   if (PeekedToken.is(Kind))
+      return false;
+   return true;
+}
+
 bool Parser::consumeToken(tok::TokenKind Kind) {
    if (CurTok.is(Kind)) {
       nextToken();
@@ -224,7 +231,7 @@ bool Parser::parseVariableDecl(StmtList &Decls) {
       Expr *E;
       if (parseExpr(E))
          return true;
-      Sem.actOnAssignmentStmt(Decls, E);
+      Sem.actOnAssignmentInit(Decls, E);
    }
 
    if (consumeToken(tok::semicolon))

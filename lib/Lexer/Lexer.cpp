@@ -107,6 +107,15 @@ void Lexer::getNextToken(Token &Tok) {
    Tok.setKind(tok::unknown);
 }
 
+Token Lexer::peek(int n = 1) {
+   const char *PrevBufPtr = BufPtr;
+   Token PeekedTok;
+   for (int i = 0; i < n; ++i)
+      getNextToken(PeekedTok);
+   BufPtr = PrevBufPtr;
+   return PeekedTok;
+}
+
 StringRef Lexer::getBuffer() const {
    return Buf;
 }

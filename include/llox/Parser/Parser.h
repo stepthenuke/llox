@@ -25,7 +25,8 @@ public:
 
 public:
    void nextToken();
-
+   
+   bool peekToken(tok::TokenKind Kind, int n);
    bool consumeToken(tok::TokenKind Kind);
    bool consumeToken(std::initializer_list<tok::TokenKind> &&Kinds);
 

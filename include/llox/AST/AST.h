@@ -63,7 +63,6 @@ using IdentList = std::vector<Identifier>;
 class Stmt {
 public:
    enum StmtKind {
-      SK_Assign,
       SK_Expr,
       SK_If,
       SK_While,
@@ -369,7 +368,8 @@ public:
       EK_Infix,
       EK_Prefix,
       EK_Obj,
-      EK_Func
+      EK_Func,
+      EK_Assign
    };
 
 private:
@@ -524,16 +524,19 @@ public:
    } 
 };
 
-class AssignmentStmt : public Stmt {
+class AssignmentExpr : public Expr {
    ObjectExpr *Obj;
    Expr *E;
 
 public:
-   AssignmentStmt(ParameterDecl *Obj, Expr *E) 
-      : Stmt(SK_Assign), Obj(new ObjectExpr(Obj)), E(E) {}
+   AssignmentExpr(ObjectExpr *O, Expr *E)
+      : Expr(EK_Assign, O->getType()), Obj(O), E(E) {}
+
+   AssignmentExpr(ParameterDecl *O, Expr *E) 
+      : Expr(EK_Assign, O->getType()), Obj(new ObjectExpr(O)), E(E) {}
       
-   AssignmentStmt(VariableDecl *Obj, Expr *E) 
-      : Stmt(SK_Assign), Obj(new ObjectExpr(Obj)), E(E) {}
+   AssignmentExpr(VariableDecl *O, Expr *E) 
+      : Expr(EK_Assign, O->getType()), Obj(new ObjectExpr(O)), E(E) {}
 
    const ObjectExpr *getObject() const {
       return Obj;
@@ -544,8 +547,8 @@ public:
    }
 
 public:
-   static bool classof(const Stmt *S) {
-      return S->getKind() == SK_Assign;
+   static bool classof(const Expr *E) {
+      return E->getKind() == EK_Assign;
    }
 
 };

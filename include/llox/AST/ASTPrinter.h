@@ -101,6 +101,7 @@ static void print(const Stmt *S) {
       printLine();
    }
    else if (auto *Stm = dyn_cast<ExprStmt>(S)) {
+      llvm::outs() << "ExprStmt ";
       print(Stm->getExpr());
    }
    else if (auto *Stm = dyn_cast<BlockStmt>(S)) {
@@ -141,11 +142,11 @@ static void print(const Stmt *S) {
    }
    else if (auto *Stm = dyn_cast<VariableDecl>(S)) {
       llvm::outs() << "VariableDecl " << Stm->getName() << " <" 
-         << Stm->getType()->getName() << "> \n";
+         << Stm->getType()->getName() << "> " << Stm << "\n";
    }
    else if (auto *Stm = dyn_cast<ParameterDecl>(S)) {
       llvm::outs() << "ParameterDecl " << Stm->getName() << " <" 
-         << Stm->getType()->getName() << "> \n"; 
+         << Stm->getType()->getName() << "> " << Stm << "\n"; 
    }
    else if (auto *Stm = dyn_cast<FunctionDecl>(S)) {
       llvm::outs() << "FunctionDecl " << Stm->getName() << " <" 

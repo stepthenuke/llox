@@ -166,20 +166,27 @@ bool Parser::parseReturnStmt(StmtList &Stmts) {
    return false;
 }
 
-bool Parser::parseBlock(StmtList &Stmts) {
+bool Parser::parseBracedStmts(StmtList &Stmts) {
    if (consumeToken(tok::l_brace))
       return true;
    
-   BlockStmt *Block = Sem.actOnBlockStmt(Stmts);
-   Sem.enterScope(Block);
-
-   StmtList BlockStmts;
    while (CurTok.isNot(tok::eof) && CurTok.isNot(tok::r_brace)) {
-      if (parseStmt(BlockStmts))
+      if (parseStmt(Stmts))
          return true;
    }
 
    if (consumeToken(tok::r_brace))
+      return true;
+
+   return false;
+}
+
+bool Parser::parseBlock(StmtList &Stmts) {
+   BlockStmt *Block = Sem.actOnBlockStmt(Stmts);
+   Sem.enterScope(Block);
+
+   StmtList BlockStmts;
+   if (parseBracedStmts(BlockStmts))
       return true;
 
    Sem.actOnBlockStmt(Block, BlockStmts);
@@ -324,7 +331,7 @@ bool Parser::parseFunctionDecl(StmtList &Decls) {
    Sem.actOnFunctionParamList(FunDecl, FunParams, RetTy);
 
    StmtList FunStmts;
-   if (parseBlock(FunStmts))
+   if (parseBracedStmts(FunStmts))
       return true;
    
    Sem.actOnFunctionBlock(Decls, FunDecl, FunStmts);

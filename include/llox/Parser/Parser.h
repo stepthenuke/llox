@@ -61,6 +61,7 @@ public:
    bool parseReturnStmt(StmtList &Stmts);
    bool parseForStmt(StmtList &Stmts);
    bool parseExprStmt(StmtList &Stmts);
+   bool parseBracedStmts(StmtList &Stmts);
    bool parseBlock(StmtList &Stmts);
 };
 

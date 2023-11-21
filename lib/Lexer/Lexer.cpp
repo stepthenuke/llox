@@ -38,7 +38,7 @@ void Lexer::getNextToken(Token &Tok) {
    // if we came to end -> it's eof
    if (!*BufPtr) {
       Tok.setKind(tok::eof);
-      llvm::outs() << ": eof\n";
+      // llvm::outs() << ": eof\n";
       return;
    }
 
@@ -125,8 +125,8 @@ void Lexer::formToken(Token &Tok, const char *TokEnd, tok::TokenKind Kind) {
    Tok.setPointer(BufPtr);
    size_t TokLen = TokEnd - BufPtr;
    Tok.setLength(TokLen);
-   llvm::outs() << StringRef(BufPtr, TokLen).str() << " : ";
-   llvm::outs() << Tok.getName().str() << "\n";
+   // llvm::outs() << StringRef(BufPtr, TokLen).str() << " : ";
+   // llvm::outs() << Tok.getName().str() << "\n";
    BufPtr = TokEnd;
 }
 

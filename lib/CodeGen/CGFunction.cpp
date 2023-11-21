@@ -178,7 +178,7 @@ void CGFunction::emit(const ExprStmt *Stm) {
 llvm::Value *CGFunction::emit(const Expr *Exp) {
    if (!Exp)
       return nullptr;
-      
+
    if (auto *E = dyn_cast<DoubleLiteral>(Exp))
       return llvm::ConstantFP::get(CGCUnit.DoubleTy, E->getValue());
    else if (auto *E = dyn_cast<BoolLiteral>(Exp))
@@ -216,6 +216,9 @@ llvm::Value *CGFunction::emit(const InfixExpr *Exp) {
       break;
    case tok::equal_equal:
       Result = Builder.CreateFCmpOEQ(Left, Right);
+      break;
+   case tok::bang_equal:
+      Result = Builder.CreateFCmpONE(Left, Right);
       break;
    case tok::less:
       Result = Builder.CreateFCmpOLT(Left, Right);

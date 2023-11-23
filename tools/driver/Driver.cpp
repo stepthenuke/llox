@@ -26,7 +26,7 @@ using namespace llox;
 static codegen::RegisterCodeGenFlags CGF;
 
 llvm::TargetMachine *createTargetMachine() {
-   llvm::Triple Triple {llvm::Triple::normalize("aarch64-linux-gnu")};
+   llvm::Triple Triple {llvm::Triple::normalize("arm64-apple-macosx14.0.0")};
    llvm::TargetOptions TargetOptions = codegen::InitTargetOptionsFromCodeGenFlags(Triple);
    std::string CPUStr  = codegen::getCPUStr();
    std::string FeaturesStr = codegen::getFeaturesStr();

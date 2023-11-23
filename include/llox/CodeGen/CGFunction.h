@@ -52,7 +52,7 @@ private:
 
 public:
    CGFunction(CGCompilationUnit &CGCUnit);
-   void run(const FunctionDecl *FunD);
+   llvm::Function *run(const FunctionDecl *FunD);
 };
 
 } // namespace llox

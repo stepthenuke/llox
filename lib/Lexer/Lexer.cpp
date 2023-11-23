@@ -125,8 +125,8 @@ void Lexer::formToken(Token &Tok, const char *TokEnd, tok::TokenKind Kind) {
    Tok.setPointer(BufPtr);
    size_t TokLen = TokEnd - BufPtr;
    Tok.setLength(TokLen);
-   // llvm::outs() << StringRef(BufPtr, TokLen).str() << " : ";
-   // llvm::outs() << Tok.getName().str() << "\n";
+   llvm::outs() << StringRef(BufPtr, TokLen).str() << " : ";
+   llvm::outs() << Tok.getName().str() << "\n";
    BufPtr = TokEnd;
 }
 

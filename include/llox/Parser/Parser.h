@@ -39,11 +39,13 @@ public:
    bool parseDecl(StmtList &Decls);
    bool parseVariableDecl(StmtList &Decls);
    bool parseTypeIdent(Decl *&D);
+   bool parseClassDecl(StmtList &Decls);
    bool parseFunctionParameter(IdentList &ParIds, StmtList &ParTypes);
    bool parseFunctionParameterList(ParameterList &Params);
    bool parseBlock(StmtList &Decls, StmtList &Stmts);
    bool parseFunctionDecl(StmtList &Decls);
    bool parseExprList(ExprList &Exprs);
+   bool parseSelector(Expr *&E);
    bool parseIdentifierExpr(Expr *&E);
    bool parseStringLiteral(Expr *&E);
    bool parseParenExpr(Expr *&E);

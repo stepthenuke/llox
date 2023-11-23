@@ -55,6 +55,8 @@ public:
    Expr *actOnPrefixExpr(Expr *E, const OperatorInfo &Op);
    void checkFunctionParameterTypes(const ParameterList &Params, const ExprList &Exprs);
    Expr *actOnFunctionCallExpr(Identifier &FunId, ExprList &ParamExprs);
+   void actOnFieldSelector(Expr *O, SMLoc Loc, StringRef Name);
+   void actOnIndexSelector(Expr *O, SMLoc Loc, Expr *IdxE);
    Expr *actOnObjectExpr(Identifier &Id);
 };
 

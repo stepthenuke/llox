@@ -29,13 +29,36 @@ var a: int = 5;
 fun foo(a: int, b: int) : int {
    return a + b;
 }
+
+var arr: int[5]; // we'll also add static arrays
+
+class Point {
+  fn init(x: double, y: double) : nil {
+    var this.x = x;
+    var this.y = y;
+  }
+
+  fn getDistanceSquared(B: Point) : double {
+    dx: double = this.x - B.x;
+    dy: double = this.y - B.y;
+    dist: double = dx * dx + dy * dy;
+    return dist;
+  }
+};
+
+fun main() -> int {
+  P1: Point = Point(2, 2);
+  P2: Point = Point(0, 0);
+  print(P1.getDisanceSquared(P2))
+  return 0;
+}
 ```
 
 ```
 var a, b: int = 5, 6; // DO WE NEED THIS?
 ```
 
-Grammar:
+Grammar from original language:
 ```
 program        → declaration* EOF ;
 
@@ -98,71 +121,3 @@ ALPHA          → "a" ... "z" | "A" ... "Z" | "_" ;
 DIGIT          → "0" ... "9" ;
 ```
 
-
-## Current progress
-```
-fun gcd(a: double, b: double) : double {
-   if (a == 0) {
-      return b;
-   }
-   while (b != 0) {
-      if (a > b) {
-         a = a - b;
-      }
-      else {
-         b = b - a;
-      }
-   }
-   return a;
-}
-
-define double @gcd(double %a, double %b) {
-entry:
-  %b2 = alloca double, align 8
-  %a1 = alloca double, align 8
-  store double %a, ptr %a1, align 8
-  store double %b, ptr %b2, align 8
-  %0 = load double, ptr %a1, align 8
-  %1 = fcmp oeq double %0, 0.000000e+00
-  br i1 %1, label %if.body, label %cont.if
-
-if.body:                                          ; preds = %entry
-  %2 = load double, ptr %b2, align 8
-  ret double %2
-
-cont.if:                                          ; preds = %entry
-  br label %while.cond
-
-while.cond:                                       ; preds = %cont.if4, %cont.if
-  %3 = load double, ptr %b2, align 8
-  %4 = fcmp one double %3, 0.000000e+00
-  br i1 %4, label %while.body, label %cont.while
-
-while.body:                                       ; preds = %while.cond
-  %5 = load double, ptr %a1, align 8
-  %6 = load double, ptr %b2, align 8
-  %7 = fcmp ogt double %5, %6
-  br i1 %7, label %if.body3, label %else.body
-
-cont.while:                                       ; preds = %while.cond
-  %8 = load double, ptr %a1, align 8
-  ret double %8
-
-if.body3:                                         ; preds = %while.body
-  %9 = load double, ptr %a1, align 8
-  %10 = load double, ptr %b2, align 8
-  %11 = fsub double %9, %10
-  store ptr %a1, double %11, align 8
-  br label %cont.if4
-
-else.body:                                        ; preds = %while.body
-  %12 = load double, ptr %b2, align 8
-  %13 = load double, ptr %a1, align 8
-  %14 = fsub double %12, %13
-  store ptr %b2, double %14, align 8
-  br label %cont.if4
-
-cont.if4:                                         ; preds = %else.body, %if.body3
-  br label %while.cond
-}
-```

@@ -92,7 +92,7 @@ void CGFunction::writeLocalVariable(const Decl *D, llvm::Value *Val) {
       auto *Alloca = createEntryBlockAlloca(D);
       Defs[D] = Alloca;
    }
-   Builder.CreateStore(Defs[D], Val);
+   Builder.CreateStore(Val, Defs[D]);
 }
 
 llvm::Value *CGFunction::readLocalVariable(const Decl *D) {
@@ -261,7 +261,15 @@ llvm::Value *CGFunction::emit(const PrefixExpr *Exp) {
 }
 
 llvm::Value *CGFunction::emit(const FunctionCallExpr *Exp) {
-   llvm_unreachable("not implemented");
+   auto ArgExprList = Exp->getParams();
+   llvm::SmallVector<llvm::Value*, 8> Args;
+   for (auto &&A : ArgExprList)
+      Args.push_back(emit(A));
+
+   const Decl *CalleeD = Exp->getFunctionDecl();
+   llvm::GlobalObject *CalleeGO = CGCUnit.getGlobal(CalleeD);
+   auto *Callee = cast<llvm::Function>(CalleeGO);
+   return Builder.CreateCall(Callee, Args);
 }
 
 llvm::Value *CGFunction::emit(const ObjectExpr *Exp) {
@@ -277,7 +285,7 @@ llvm::Value *CGFunction::emit(const AssignmentExpr *Exp) {
 CGFunction::CGFunction(CGCompilationUnit &CGCUnit)
    : CGCUnit(CGCUnit), Builder(CGCUnit.getLLVMContext()), CurBlock(nullptr) {}
 
-void CGFunction::run(const FunctionDecl *FunD) {
+llvm::Function *CGFunction::run(const FunctionDecl *FunD) {
    this->FunD = FunD;
    FnTy = createFunctionType(FunD);
    Fn = createFunction(FunD, FnTy);
@@ -299,6 +307,8 @@ void CGFunction::run(const FunctionDecl *FunD) {
    if (!CurBlock->getTerminator()) {
       Builder.CreateRetVoid();
    }
+
+   return Fn;
 }
 
 } // namespace llox

@@ -7,6 +7,7 @@
 #include "llox/Basic/LLVM.h"
 #include "llox/Basic/TokenKinds.h"
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SMLoc.h"
 
@@ -50,6 +51,7 @@ public:
 class Decl;
 class Stmt;
 class Expr;
+class Selector;
 class TypeDecl;
 class ParameterDecl;
 using Identifier = std::pair<SMLoc, StringRef>;
@@ -57,6 +59,7 @@ using Identifier = std::pair<SMLoc, StringRef>;
 using DeclList = std::vector<Decl*>;
 using StmtList = std::vector<Stmt*>;
 using ExprList = std::vector<Expr*>;
+using SelectorList = std::vector<Selector*>;
 using ParameterList = std::vector<ParameterDecl*>;
 using IdentList = std::vector<Identifier>;
 
@@ -73,6 +76,8 @@ public:
       DK_Param,
       DK_CompUnit,
       DK_GlobalType,
+      DK_ArrayType,
+      DK_ClassType,
       DK_TypeEnd,
       DK_End
    };
@@ -220,7 +225,7 @@ public:
       return Loc;
    }
 
-   StringRef getName() const {
+   const StringRef getName() const {
       return Name;
    }
 
@@ -360,9 +365,98 @@ public:
    }
 };
 
+
+class ArrayTypeDecl : public TypeDecl {
+   Expr *Num;
+   TypeDecl *Ty;
+
+public:
+   ArrayTypeDecl(Decl *EnclosingDecl, SMLoc Loc, StringRef Name,
+      Expr *Num, TypeDecl *Ty)
+         : TypeDecl(DK_ArrayType, EnclosingDecl, Loc, Name), 
+           Num(Num), Ty(Ty) {}
+
+   TypeDecl *getType() const {
+      return Ty;
+   }
+
+   const Expr *getNum() const {
+      return Num;
+   }
+
+public:
+   static bool classof(const Stmt *D) {
+      return D->getKind() == DK_ArrayType;
+   }
+};
+
+class Field {
+   SMLoc Loc;
+   StringRef Name;
+   TypeDecl *Ty;
+
+public:
+   Field(SMLoc Loc, StringRef Name, TypeDecl *Ty) 
+      : Loc(Loc), Name(Name), Ty(Ty) {}
+   
+   SMLoc getLocation() const {
+      return Loc;
+   }
+
+   const StringRef getName() const {
+      return Name;
+   }
+
+   TypeDecl *getType() const {
+      return Ty;
+   }
+};
+
+using FieldList = std::vector<Field*>;
+
+class ClassTypeDecl : public TypeDecl {
+   FunctionDecl *Init;
+   FieldList Fields;
+   StmtList Methods;
+
+   ClassTypeDecl *SuperClassD;
+
+public:
+   ClassTypeDecl(Stmt *EnclosingDecl, SMLoc Loc, StringRef Name, 
+      FunctionDecl *Init, FieldList &Fields, StmtList &Methods, ClassTypeDecl *SuperD = nullptr)
+         : TypeDecl(DK_ClassType, EnclosingDecl, Loc, Name), 
+           Init(Init), Fields(Fields), Methods(Methods), SuperClassD(SuperD) {}
+
+   const FunctionDecl *getInit() const {
+      return Init;
+   }
+
+   const FieldList &getFields() const {
+      return Fields;
+   }
+
+   const StmtList &getMethods() const {
+      return Methods;
+   }
+
+   ClassTypeDecl *getSuperClass() const {
+      return SuperClassD;
+   }
+
+   void setSuperClass(ClassTypeDecl *SuperD) {
+      SuperClassD = SuperD;
+   }
+
+public:
+   static bool classof(const Stmt *D) {
+      return D->getKind() == DK_ClassType;
+   }
+};
+
 class Expr {
 public:
    enum ExprKind {
+      EK_Int,
       EK_Double,
       EK_Bool,
       EK_Infix,
@@ -391,6 +485,28 @@ public:
 
    void setType(TypeDecl *T) {
       Ty = T;
+   }
+};
+
+class IntLiteral : public Expr {
+   SMLoc Loc;
+   llvm::APSInt Value;
+
+public:
+   IntLiteral(SMLoc Loc, const llvm::APSInt &Value, TypeDecl *Ty)
+      : Expr(EK_Double, Ty), Loc(Loc), Value(Value) {}
+   
+   llvm::APSInt &getValue() {
+      return Value;
+   }
+
+   const llvm::APSInt &getValue() const {
+      return Value;
+   }
+
+public:
+   static bool classof(const Expr *E) {
+      return E->getKind() == EK_Int;
    }
 };
 
@@ -490,7 +606,7 @@ public:
    FunctionCallExpr(FunctionDecl *Func, ExprList Params)
       : Expr(EK_Func, Func->getRetType()), Func(Func), Params(Params) {}
 
-   FunctionDecl *getFunctionDecl() const {
+   const FunctionDecl *getFunctionDecl() const {
       return Func;
    }
 
@@ -504,8 +620,10 @@ public:
    }
 };
 
+
 class ObjectExpr : public Expr {
    Decl *Obj;
+   SelectorList Selectors;
 
 public:
    ObjectExpr(ParameterDecl *Obj) 
@@ -516,6 +634,18 @@ public:
 
    const Decl *getObjectDecl() const {
       return Obj;
+   }
+
+   void setSelectors(SelectorList &SL) {
+      Selectors = SL;
+   }
+
+   void addSelector(Selector *S) {
+      Selectors.push_back(S);
+   }
+
+   const SelectorList &getSelectors() const {
+      return Selectors;
    }
 
 public:
@@ -552,6 +682,71 @@ public:
    }
 
 };
+
+class Selector {
+public:
+   enum SelectorKind {
+      SK_Index,
+      SK_Field
+   };
+
+private:
+   const SelectorKind Kind;
+   TypeDecl *Ty;
+
+protected:
+   Selector(SelectorKind Kind, TypeDecl *Ty)
+      : Kind(Kind), Ty(Ty) {}
+
+public:
+   SelectorKind getKind() const {
+      return Kind;
+   }
+
+   TypeDecl *getType() const {
+      return Ty;
+   }
+};
+
+class IndexSelector : public Selector {
+   Expr *Idx;
+
+public:
+   IndexSelector(Expr *Idx, TypeDecl *Ty)
+      : Selector(SK_Index, Ty), Idx(Idx) {}
+   
+   const Expr *getIndex() const {
+      return Idx;
+   }
+
+public:
+   static bool classof(const Selector *S) {
+      return S->getKind() == SK_Index;
+   }
+};
+
+class FieldSelector : public Selector {
+   uint Idx;
+   StringRef Name;
+
+public:
+   FieldSelector(uint Idx, StringRef Name, TypeDecl *Ty)
+      : Selector(SK_Index, Ty), Idx(Idx), Name(Name) {}
+
+   const StringRef getName() const {
+      return Name;
+   }
+
+   uint getIndex() const {
+      return Idx;
+   }
+
+public:
+   static bool classof(const Selector *S) {
+      return S->getKind() == SK_Index;
+   }
+};
+
 
 } //namespace llox
 

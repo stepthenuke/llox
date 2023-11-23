@@ -276,6 +276,29 @@ Expr *Sema::actOnFunctionCallExpr(Identifier &FunId, ExprList &ParamExprs) {
    return nullptr;
 }
 
+void Sema::actOnFieldSelector(Expr *O, SMLoc Loc, StringRef Name) {
+   if (auto *ObjE = dyn_cast<ObjectExpr>(O)) {
+      if (auto *ClassTy = dyn_cast<ClassTypeDecl>(ObjE->getType())) {
+         uint Idx = 0;
+         for (const auto &F : ClassTy->getFields()) {
+            if (Name == F->getName()) {
+               ObjE->addSelector(new FieldSelector(Idx, Name, F->getType()));
+               return;
+            }
+            ++Idx;
+         }
+      }
+   }
+}
+
+void Sema::actOnIndexSelector(Expr *O, SMLoc Loc, Expr *IdxE) {
+   if (auto *ObjE = dyn_cast<ObjectExpr>(O)) {
+      if (auto *ArrTy = dyn_cast<ArrayTypeDecl>(ObjE->getType())) {
+         ObjE->addSelector(new IndexSelector(IdxE, ArrTy->getType()));
+      }
+   }
+}
+
 Expr *Sema::actOnObjectExpr(Identifier &Id) {
    Decl *D = actOnNameLookup(CurDecl, Id.first, Id.second);
    if (auto *V = dyn_cast_or_null<VariableDecl>(D)) {

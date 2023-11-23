@@ -247,6 +247,52 @@ bool Parser::parseVariableDecl(StmtList &Decls) {
    return false;
 }
 
+bool Parser::parseClassDecl(StmtList &Decls) {
+   if (consumeToken(tok::kw_class))
+      return true;
+   if (CurTok.isNot(tok::identifier))
+      return true;
+   Identifier ClassId {CurTok.getLocation(), CurTok.getIdentifier()};
+   nextToken();
+
+   ClassTypeDecl *ClassD; // create and add to scope
+
+   // class Klass < SuperKlass
+   if (CurTok.is(tok::less)) {
+      nextToken();
+      Decl *SuperD;
+      if (parseTypeIdent(SuperD))
+         return true;
+      if (auto *Super = dyn_cast<ClassTypeDecl>(SuperD))
+         ClassD->setSuperClass(Super);
+   }
+
+   if (consumeToken(tok::l_brace))
+      return true;
+
+   // add init method and fields
+   Sem.enterScope(ClassD);
+
+   FunctionDecl *Init = nullptr;
+   StmtList InitStmt;
+   if (CurTok.is(tok::kw_fun)) {
+      if (parseFunctionDecl(InitStmt))
+         return true;
+      Init = cast<FunctionDecl>(InitStmt.front());  
+   }
+   // Sem.actOnClassInit(ClassD, Init);
+
+   StmtList Methods;
+   while (CurTok.is(tok::kw_fun)) {
+      if (parseFunctionDecl(Methods))
+         return true;
+   }
+   // Sem.actOnClassMethods(Class, Methods);
+
+   Sem.leaveScope();
+   return false;
+} 
+
 bool Parser::parseTypeIdent(Decl *&D) {
    D = nullptr;
    if (CurTok.is(tok::kw_nil))
@@ -358,6 +404,30 @@ bool Parser::parseExprList(ExprList &Exprs) {
    return false;
 }
 
+bool Parser::parseSelector(Expr *&E) {
+   if (!CurTok.isOneOf({tok::dot, tok::l_bracket}))
+      return true;
+
+   if (CurTok.is(tok::dot)) {
+      nextToken();
+      if (!CurTok.is(tok::identifier))
+         return true;
+      Sem.actOnFieldSelector(E, CurTok.getLocation(), CurTok.getIdentifier());
+      nextToken();
+   }
+   else if (CurTok.is(tok::l_bracket)) {
+      SMLoc Loc = CurTok.getLocation();
+      nextToken();
+      Expr *IdxE = nullptr;
+      if (parseExpr(IdxE))
+         return true;
+      Sem.actOnIndexSelector(E, Loc, IdxE);
+      if (consumeToken(tok::r_bracket))
+         return true;
+   }
+   return false;
+}
+
 bool Parser::parseIdentifierExpr(Expr *&E) {
    if (CurTok.isNot(tok::identifier))
       return true;
@@ -434,7 +504,7 @@ bool Parser::parseExpr(Expr *&E) {
       return true;
    if (!E)
       return false;
-   if (CurTok.is(tok::r_paren))
+   if (CurTok.isOneOf({tok::r_paren, tok::r_bracket}))
       return false;
 
    return parseInfixExpr(op::Prec_None, E);
@@ -442,7 +512,7 @@ bool Parser::parseExpr(Expr *&E) {
 
 bool Parser::parseInfixExpr(OperatorPrec LeftPrec, Expr *&Left) {
    while (true) {
-      if (CurTok.isOneOf({tok::comma, tok::semicolon, tok::r_paren})) {
+      if (CurTok.isOneOf({tok::comma, tok::semicolon, tok::r_paren, tok::r_bracket})) {
          return false;
       }
 

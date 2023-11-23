@@ -1,0 +1,18 @@
+fun gcd(a: double, b: double) : double {
+   if (a == 0) {
+      return b;
+   }
+   while (b != 0) {
+      if (a > b) {
+         a = a - b;
+      }
+      else {
+         b = b - a;
+      }
+   }
+   return a;
+}
+
+fun main() : double {
+   return gcd(144, 18);
+}

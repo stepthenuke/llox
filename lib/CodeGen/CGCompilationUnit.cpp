@@ -40,14 +40,15 @@ void CGCompilationUnit::run(const CompilationUnitDecl *CU) {
             convertType(VarD->getType()), 
             false, 
             llvm::GlobalValue::PrivateLinkage, 
-            nullptr, 
+            nullptr,
             VarD->getName()
          );
          Globals[VarD] = V;
       }
       else if (auto *FunD = dyn_cast<FunctionDecl>(Stm)) {
          CGFunction CGFun(*this);
-         CGFun.run(FunD);
+         llvm::Function *Fn = CGFun.run(FunD);
+         Globals[FunD] = Fn;
       }
    }
 }

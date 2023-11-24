@@ -38,6 +38,7 @@ public:
    bool parseCompilationUnit(CompilationUnitDecl *&CompUnit);
    bool parseDecl(StmtList &Decls);
    bool parseVariableDecl(StmtList &Decls);
+   bool parseField(StmtList &Decls);
    bool parseTypeIdent(Decl *&D);
    bool parseClassDecl(StmtList &Decls);
    bool parseFunctionParameter(IdentList &ParIds, StmtList &ParTypes);
@@ -49,6 +50,7 @@ public:
    bool parseIdentifierExpr(Expr *&E);
    bool parseStringLiteral(Expr *&E);
    bool parseParenExpr(Expr *&E);
+   bool parseIntLiteral(Expr *&E);
    bool parseDoubleLiteral(Expr *&E);
    bool parseBoolLiteral(Expr *&E);
    bool parsePrimary(Expr *&E);

@@ -7,22 +7,26 @@
 #include "llox/Basic/LLVM.h"
 #include "llox/Basic/TokenKinds.h"
 #include "llox/Sema/Scope.h"
+#include "llox/Sema/TypeChecker.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SMLoc.h"
 
 namespace llox {
 
+class TypeChecker;
+
 class Sema {
    Scope *CurScope;
    Stmt *CurDecl;
+   TypeChecker TyChecker;
 
+   TypeDecl *IntType;
    TypeDecl *DoubleType;
    TypeDecl *BoolType;
+   TypeDecl *StringType;
    BoolLiteral *TrueLiteral;
    BoolLiteral *FalseLiteral;
-
-   bool checkOperatorType(tok::TokenKind OpKind, TypeDecl *Ty);
 
 public:
    void enterScope(Stmt *D);
@@ -30,6 +34,10 @@ public:
 
 public:
    Sema();
+
+   TypeDecl *getBool();
+   TypeDecl *getInt();
+   TypeDecl *getDouble();
 
    CompilationUnitDecl *actOnCompilationUnit(StringRef Name);
 
@@ -41,6 +49,7 @@ public:
    void actOnBlockStmt(BlockStmt *Block, StmtList &BlockStmts);
    void actOnExprStmt(StmtList &Stmts, Expr *E);
    void *actOnAssignmentInit(StmtList &Decls, Expr *E);
+   ClassTypeDecl *actOnClassDecl(Identifier &Id, ClassTypeDecl *SuperD);
 
    Expr *actOnAssignmentExpr(Expr *Left, Expr *Right);
    FunctionDecl *actOnFunctionDecl(SMLoc Loc, StringRef Name);
@@ -50,10 +59,11 @@ public:
    Decl *actOnNameLookup(Stmt *Prev, SMLoc Loc, StringRef Name);
    void actOnVariableDecl(StmtList &Decls, Identifier Id, Decl *D);
    Expr *actOnDoubleLiteral(SMLoc Loc, StringRef Literal);
+   Expr *actOnIntLiteral(SMLoc Loc, StringRef Literal);
    Expr *actOnBoolLiteral(tok::TokenKind K);
+   Expr *actOnStringLiteral(SMLoc Loc, StringRef Literal);
    Expr *actOnInfixExpr(Expr *Left, Expr *Right, const OperatorInfo &Op);
    Expr *actOnPrefixExpr(Expr *E, const OperatorInfo &Op);
-   void checkFunctionParameterTypes(const ParameterList &Params, const ExprList &Exprs);
    Expr *actOnFunctionCallExpr(Identifier &FunId, ExprList &ParamExprs);
    void actOnFieldSelector(Expr *O, SMLoc Loc, StringRef Name);
    void actOnIndexSelector(Expr *O, SMLoc Loc, Expr *IdxE);

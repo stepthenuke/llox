@@ -153,6 +153,11 @@ void Lexer::setNumber(Token &Tok) {
       ++End;
    }
    
+   if (DotCnt == 0) {
+      formToken(Tok, End, tok::int_literal);
+      return;
+   }
+
    if (DotCnt == 0 || DotCnt == 1) {
       formToken(Tok, End, tok::double_literal);
       return;

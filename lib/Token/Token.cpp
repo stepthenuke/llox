@@ -40,7 +40,7 @@ StringRef Token::getIdentifier() const {
 }
 
 StringRef Token::getLiteral() const {
-   assert(isOneOf({tok::double_literal, tok::string_literal}) && "not literal");
+   assert(isOneOf({tok::int_literal, tok::double_literal, tok::string_literal}) && "not literal");
    return StringRef(Ptr, Length);
 }
 

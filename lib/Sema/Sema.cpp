@@ -2,30 +2,16 @@
 
 namespace llox {
 
-bool Sema::checkOperatorType(tok::TokenKind OpKind, TypeDecl *Ty) {
-   switch (OpKind) {
-   case tok::equal:
-   case tok::bang_equal:
-   case tok::equal_equal:
-      return Ty == BoolType || Ty == DoubleType;
-   case tok::greater:
-   case tok::greater_equal:
-   case tok::less:
-   case tok::less_equal:
-   case tok::plus:
-   case tok::minus:
-   case tok::star:
-   case tok::slash:
-      return Ty == DoubleType;
-   case tok::bang:
-   case tok::kw_and:
-   case tok::kw_or:
-      return Ty == BoolType;
-   default:
-      llvm::outs() <<tok::getTokenName(OpKind) << " ";
-      llvm_unreachable("unknown operator");
-   }
-   return false;
+TypeDecl *Sema::getBool() {
+   return BoolType;
+}
+
+TypeDecl *Sema::getInt() {
+   return IntType;
+}
+
+TypeDecl *Sema::getDouble() {
+   return DoubleType;
 }
 
 // We can enter in scope of function or block
@@ -49,11 +35,14 @@ void Sema::leaveScope() {
 }
 
 Sema::Sema()
-   : CurScope(new Scope()), CurDecl(nullptr) {
+   : CurScope(new Scope()), CurDecl(nullptr), TyChecker(CurScope, this) {
+   IntType = new GlobalTypeDecl(CurDecl, SMLoc(), "int");
    DoubleType = new GlobalTypeDecl(CurDecl, SMLoc(), "double");
    BoolType = new GlobalTypeDecl(CurDecl, SMLoc(), "bool");
+   StringType = new GlobalTypeDecl(CurDecl, SMLoc(), "string");
    TrueLiteral = new BoolLiteral(true, BoolType);
    FalseLiteral = new BoolLiteral(false, BoolType);
+   CurScope->insert(IntType);
    CurScope->insert(DoubleType);
    CurScope->insert(BoolType);
 }
@@ -140,6 +129,8 @@ void Sema::actOnFunctionParamList(FunctionDecl *FunDecl, ParameterList &Params, 
 }
 
 void Sema::actOnFunctionBlock(StmtList &Decls, FunctionDecl *FunDecl, StmtList &FunStmts) {
+   if (TyChecker.checkFunctionRetTy(FunDecl, FunStmts))
+      llvm_unreachable("return of incorrect type");
    FunDecl->setStmts(FunStmts);
    Decls.push_back(FunDecl);
 }
@@ -189,8 +180,18 @@ void Sema::actOnVariableDecl(StmtList &Decls, Identifier Id, Decl *D) {
       llvm_unreachable("no such type in var decl");
 }
 
+Expr *Sema::actOnIntLiteral(SMLoc Loc, StringRef Literal) {
+   llvm::APInt Value(64, Literal, 10);
+   return new IntLiteral(Loc, llvm::APSInt(Value, false), IntType);
+}
+
 Expr *Sema::actOnDoubleLiteral(SMLoc Loc, StringRef Literal) {
    return new DoubleLiteral(Loc, llvm::APFloat(llvm::APFloat::IEEEdouble(), Literal), DoubleType);
+}
+
+Expr *Sema::actOnStringLiteral(SMLoc Loc, StringRef Literal) {
+   StringRef StringData = Literal.drop_back().drop_front();
+   return new StringLiteral(Loc, StringData, StringType);
 }
 
 Expr *Sema::actOnBoolLiteral(tok::TokenKind K) {
@@ -225,19 +226,13 @@ Expr *Sema::actOnInfixExpr(Expr *Left, Expr *Right, const OperatorInfo &Op) {
    if (!Right)
       return Left;
 
-   if (Left->getType() != Right->getType())
+   llvm::outs() << Left->getType()->getName() << " " << Right->getType()->getName() << "\n";
+   TypeDecl *Ty = TyChecker.getInfixTy(Left->getType(), Right->getType());
+   if (!Ty)
       llvm_unreachable("incompatible types");
 
-   TypeDecl *Ty = Left->getType();
-   if (!checkOperatorType(Op.getKind(), Ty))
-      llvm_unreachable("incompatible operator for vals");
-
-   bool RetTypeIsBool = op::isLogicalBinOp(Op.getKind());
-   Ty = RetTypeIsBool ? BoolType : Ty;
-
-   if (Op.getKind() == tok::equal) {
+   if (Op.getKind() == tok::equal)
       return actOnAssignmentExpr(Left, Right);
-   }
 
    return new InfixExpr(Left, Right, Op, Ty);
 }
@@ -247,29 +242,16 @@ Expr *Sema::actOnPrefixExpr(Expr *E, const OperatorInfo &Op) {
       return nullptr;
 
    TypeDecl *Ty = E->getType();
-   if (!checkOperatorType(Op.getKind(), Ty))
+   if (!TyChecker.checkOperatorType(Op.getKind(), Ty))
       llvm_unreachable("incompatible operator for val");
 
    return new PrefixExpr(E, Op, Ty);
 }
 
-void Sema::checkFunctionParameterTypes(const ParameterList &Params, const ExprList &Exprs) {
-   if (Params.size() != Exprs.size())
-      llvm_unreachable("params size != parameter exprs size");
-   
-   auto E = Exprs.begin();
-   for (auto P = Params.begin(), PE = Params.end(); P != PE; ++P, ++E) {
-      ParameterDecl *Par = *P;
-      Expr *Expr = *E;
-      if (Par->getType() != Expr->getType())
-         llvm_unreachable("param and args types of function do not correspond");
-   }
-}
-
 Expr *Sema::actOnFunctionCallExpr(Identifier &FunId, ExprList &ParamExprs) {
    Decl *D = actOnNameLookup(CurDecl, FunId.first, FunId.second);
    if (auto *F = dyn_cast_or_null<FunctionDecl>(D)) {
-      checkFunctionParameterTypes(F->getParams(), ParamExprs);
+      TyChecker.checkFunctionParameterTypes(F->getParams(), ParamExprs);
       return new FunctionCallExpr(F, ParamExprs);
    } 
    llvm_unreachable("no such function for call");
@@ -280,7 +262,8 @@ void Sema::actOnFieldSelector(Expr *O, SMLoc Loc, StringRef Name) {
    if (auto *ObjE = dyn_cast<ObjectExpr>(O)) {
       if (auto *ClassTy = dyn_cast<ClassTypeDecl>(ObjE->getType())) {
          uint Idx = 0;
-         for (const auto &F : ClassTy->getFields()) {
+         for (const auto &FieldS : ClassTy->getFields()) {
+            auto *F = cast<Field>(FieldS);
             if (Name == F->getName()) {
                ObjE->addSelector(new FieldSelector(Idx, Name, F->getType()));
                return;
@@ -310,5 +293,21 @@ Expr *Sema::actOnObjectExpr(Identifier &Id) {
    llvm_unreachable("object (variable or parameter) is not declared");
    return nullptr;
 }
+
+ClassTypeDecl *Sema::actOnClassDecl(Identifier &Id, ClassTypeDecl *SuperD) {
+   ClassTypeDecl *ClassD = new ClassTypeDecl(CurDecl, Id.first, Id.second);
+   ClassD->setSuperClass(SuperD);
+   if (!CurScope->insert(ClassD))
+      llvm_unreachable("Redeclaration of class");
+
+   return ClassD;
+}
+
+// void Sema::actOnClassInit(ClassTypeDecl *ClassD, FunctionDecl *Init) {
+//    FieldList Fields;
+
+//    StmtList InitStmts = Init->getStmts();
+//    for (VariableDecl)
+// }
 
 } // namespace llox

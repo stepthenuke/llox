@@ -44,13 +44,21 @@ static void print(const Expr *E) {
    if (!E) return;
 
    printSpaces();
-   if (auto *Exp = dyn_cast<DoubleLiteral>(E)) {
+   if (auto *Exp = dyn_cast<IntLiteral>(E)) {
+      llvm::SmallVector<char, 16> Buffer;
+      Exp->getValue().toString(Buffer);
+      llvm::outs() << "IntLiteral " << Buffer << "\n";
+   }
+   else if (auto *Exp = dyn_cast<DoubleLiteral>(E)) {
       llvm::SmallVector<char, 16> Buffer;
       Exp->getValue().toString(Buffer);
       llvm::outs() << "DoubleLiteral " << Buffer << "\n";
    }
    else if (auto *Exp = dyn_cast<BoolLiteral>(E)) {
       llvm::outs() << "BoolLiteral " << (Exp->getValue() ? "true" : "false") << "\n";
+   }
+   else if (auto *Exp = dyn_cast<StringLiteral>(E)) {
+      llvm::outs() << "StringLiteral \"" << Exp->getData() << "\"\n";
    }
    else if (auto *Exp = dyn_cast<InfixExpr>(E)) {
       llvm::outs() << "InfixExpr <" << Exp->getType()->getName() << "> " 

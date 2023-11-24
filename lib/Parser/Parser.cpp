@@ -219,19 +219,24 @@ bool Parser::parseDecl(StmtList &Decls) {
 bool Parser::parseVariableDecl(StmtList &Decls) {
    if (consumeToken(tok::kw_var))
       return true;
-   if (CurTok.isNot(tok::identifier))
+   if (!CurTok.isOneOf({tok::identifier, tok::kw_this}))
       return true;
+   
+   if (CurTok.is(tok::kw_this)) {
+      return parseField(Decls);
+   }
+   
    Identifier VarId {CurTok.getLocation(), CurTok.getIdentifier()};
    nextToken();
 
    if (consumeToken(tok::colon))
       return true;
 
-   Decl *D;
-   if (parseTypeIdent(D))
+   Decl *Ty;
+   if (parseTypeIdent(Ty))
       return true;
 
-   Sem.actOnVariableDecl(Decls, VarId, D);
+   Sem.actOnVariableDecl(Decls, VarId, Ty);
    
    if (CurTok.is(tok::equal)) {
       nextToken();
@@ -247,6 +252,27 @@ bool Parser::parseVariableDecl(StmtList &Decls) {
    return false;
 }
 
+bool Parser::parseField(StmtList &Decls) {
+   if (consumeToken(tok::kw_this) || consumeToken(tok::dot))
+      return true;
+
+   if (CurTok.isNot(tok::identifier))
+      return true;
+
+   Identifier FieldId {CurTok.getLocation(), CurTok.getIdentifier()};
+   nextToken();
+
+   if (consumeToken(tok::colon))
+      return true;
+
+   Decl *Ty;
+   if (parseTypeIdent(Ty))
+      return true;   
+
+   // Sem.actOnField(Decls, FieldId, Ty);
+   return false;
+}
+
 bool Parser::parseClassDecl(StmtList &Decls) {
    if (consumeToken(tok::kw_class))
       return true;
@@ -255,8 +281,8 @@ bool Parser::parseClassDecl(StmtList &Decls) {
    Identifier ClassId {CurTok.getLocation(), CurTok.getIdentifier()};
    nextToken();
 
-   ClassTypeDecl *ClassD; // create and add to scope
 
+   ClassTypeDecl *ClassD = nullptr;
    // class Klass < SuperKlass
    if (CurTok.is(tok::less)) {
       nextToken();
@@ -264,9 +290,9 @@ bool Parser::parseClassDecl(StmtList &Decls) {
       if (parseTypeIdent(SuperD))
          return true;
       if (auto *Super = dyn_cast<ClassTypeDecl>(SuperD))
-         ClassD->setSuperClass(Super);
+         ClassD = Sem.actOnClassDecl(ClassId, Super);
    }
-
+   
    if (consumeToken(tok::l_brace))
       return true;
 
@@ -280,7 +306,7 @@ bool Parser::parseClassDecl(StmtList &Decls) {
          return true;
       Init = cast<FunctionDecl>(InitStmt.front());  
    }
-   // Sem.actOnClassInit(ClassD, Init);
+   // Sem.actOnClassInit(ClassD, Init); // here must happen fields creating
 
    StmtList Methods;
    while (CurTok.is(tok::kw_fun)) {
@@ -451,6 +477,12 @@ bool Parser::parseIdentifierExpr(Expr *&E) {
 }
 
 bool Parser::parseStringLiteral(Expr *&E) {
+   if (CurTok.is(tok::string_literal)) {
+      E = Sem.actOnStringLiteral(CurTok.getLocation(), CurTok.getLiteral());
+      assert(isa<StringLiteral>(E));
+      nextToken();
+      return false;
+   }
    return true;
 }
 
@@ -460,6 +492,16 @@ bool Parser::parseParenExpr(Expr *&E) {
       return true;
    consumeToken(tok::r_paren);
    return false;
+}
+
+bool Parser::parseIntLiteral(Expr *&E) {
+   if (CurTok.is(tok::int_literal)) {
+      E = Sem.actOnIntLiteral(CurTok.getLocation(), CurTok.getLiteral());
+      assert(isa<IntLiteral>(E));
+      nextToken();
+      return false;
+   }
+   return true;
 }
 
 bool Parser::parseDoubleLiteral(Expr *&E) {
@@ -481,6 +523,7 @@ bool Parser::parseBoolLiteral(Expr *&E) {
    return true;
 }
 
+
 bool Parser::parsePrimary(Expr *&E) {
    switch (CurTok.getKind()) {
    case tok::kw_false:
@@ -488,6 +531,8 @@ bool Parser::parsePrimary(Expr *&E) {
       return parseBoolLiteral(E);  // TODO: do smth on false and true
    case tok::identifier:
       return parseIdentifierExpr(E);
+   case tok::int_literal:
+      return parseIntLiteral(E);
    case tok::double_literal:
       return parseDoubleLiteral(E);
    case tok::string_literal:

@@ -14,5 +14,5 @@ fun gcd(a: double, b: double) : double {
 }
 
 fun main() : double {
-   return gcd(144, 18);
+   return 1;
 }

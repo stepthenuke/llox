@@ -71,6 +71,7 @@ public:
       SK_While,
       SK_Return,
       SK_Block,
+      SK_Field,
       DK_Var,
       DK_Func,
       DK_Param,
@@ -176,22 +177,6 @@ public:
    }
 };
 
-class ReturnStmt : public Stmt {
-   Expr *RetVal;
-
-public:
-   ReturnStmt(Expr *RetVal)
-      : Stmt(SK_Return), RetVal(RetVal) {}
-   
-   Expr *getRetVal() const {
-      return RetVal;
-   }
-
-public:
-   static bool classof(const Stmt *S) {
-      return S->getKind() == SK_Return;
-   } 
-};
 
 class ExprStmt : public Stmt {
    Expr *E;
@@ -390,14 +375,14 @@ public:
    }
 };
 
-class Field {
+class Field : public Stmt {
    SMLoc Loc;
    StringRef Name;
    TypeDecl *Ty;
 
 public:
    Field(SMLoc Loc, StringRef Name, TypeDecl *Ty) 
-      : Loc(Loc), Name(Name), Ty(Ty) {}
+      : Stmt(SK_Field), Loc(Loc), Name(Name), Ty(Ty) {}
    
    SMLoc getLocation() const {
       return Loc;
@@ -410,20 +395,28 @@ public:
    TypeDecl *getType() const {
       return Ty;
    }
+
+public:
+   static bool classof(const Stmt* S) {
+      return S->getKind() == SK_Field;
+   }
+
 };
 
-using FieldList = std::vector<Field*>;
 
 class ClassTypeDecl : public TypeDecl {
    FunctionDecl *Init;
-   FieldList Fields;
+   StmtList Fields;
    StmtList Methods;
 
    ClassTypeDecl *SuperClassD;
 
 public:
+   ClassTypeDecl(Stmt *EnclosingDecl, SMLoc Loc, StringRef Name)
+      : TypeDecl(DK_ClassType, EnclosingDecl, Loc, Name) {} 
+
    ClassTypeDecl(Stmt *EnclosingDecl, SMLoc Loc, StringRef Name, 
-      FunctionDecl *Init, FieldList &Fields, StmtList &Methods, ClassTypeDecl *SuperD = nullptr)
+      FunctionDecl *Init, StmtList &Fields, StmtList &Methods, ClassTypeDecl *SuperD = nullptr)
          : TypeDecl(DK_ClassType, EnclosingDecl, Loc, Name), 
            Init(Init), Fields(Fields), Methods(Methods), SuperClassD(SuperD) {}
 
@@ -431,7 +424,7 @@ public:
       return Init;
    }
 
-   const FieldList &getFields() const {
+   const StmtList &getFields() const {
       return Fields;
    }
 
@@ -459,6 +452,7 @@ public:
       EK_Int,
       EK_Double,
       EK_Bool,
+      EK_String,
       EK_Infix,
       EK_Prefix,
       EK_Obj,
@@ -488,13 +482,34 @@ public:
    }
 };
 
+class ReturnStmt : public Stmt {
+   Expr *RetVal;
+
+public:
+   ReturnStmt(Expr *RetVal)
+      : Stmt(SK_Return), RetVal(RetVal) {}
+   
+   Expr *getRetVal() const {
+      return RetVal;
+   }
+
+   TypeDecl *getRetType() const {
+      return RetVal->getType();
+   }
+
+public:
+   static bool classof(const Stmt *S) {
+      return S->getKind() == SK_Return;
+   } 
+};
+
 class IntLiteral : public Expr {
    SMLoc Loc;
    llvm::APSInt Value;
 
 public:
    IntLiteral(SMLoc Loc, const llvm::APSInt &Value, TypeDecl *Ty)
-      : Expr(EK_Double, Ty), Loc(Loc), Value(Value) {}
+      : Expr(EK_Int, Ty), Loc(Loc), Value(Value) {}
    
    llvm::APSInt &getValue() {
       return Value;
@@ -529,6 +544,28 @@ public:
 public:
    static bool classof(const Expr *E) {
       return E->getKind() == EK_Double;
+   }
+};
+
+class StringLiteral : public Expr {
+   SMLoc Loc;
+   StringRef Data;
+
+public:
+   StringLiteral(SMLoc Loc, StringRef Data, TypeDecl *Ty)
+      : Expr(EK_String, Ty), Loc(Loc), Data(Data){}
+   
+   StringRef &getData() {
+      return Data;
+   }
+
+   const StringRef &getData() const {
+      return Data;
+   }
+
+public:
+   static bool classof(const Expr *E) {
+      return E->getKind() == EK_String;
    }
 };
 

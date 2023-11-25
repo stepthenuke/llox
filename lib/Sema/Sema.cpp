@@ -35,7 +35,7 @@ void Sema::leaveScope() {
 }
 
 Sema::Sema()
-   : CurScope(new Scope()), CurDecl(nullptr), TyChecker(CurScope, this) {
+   : GlobalScope(new Scope()), CurScope(GlobalScope), CurDecl(nullptr), TyChecker(CurScope, this) {
    IntType = new GlobalTypeDecl(CurDecl, SMLoc(), "int");
    DoubleType = new GlobalTypeDecl(CurDecl, SMLoc(), "double");
    BoolType = new GlobalTypeDecl(CurDecl, SMLoc(), "bool");
@@ -285,16 +285,21 @@ TypeDecl *Sema::actOnFieldSelector(Stmt *O, SelectorList &SelList, StringRef Nam
       TypeDecl *FieldTy = StructTy->getFieldType(Name);
       SelList.push_back(new FieldSelector(Idx, Name, FieldTy));
 
-      if (auto *Ty = dyn_cast<StructTypeDecl>(FieldTy))
-         return Ty;
+      print(FieldTy);
+      if (isa<StructTypeDecl>(FieldTy) || isa<ArrayTypeDecl>(FieldTy))
+         return FieldTy;
    }
    return nullptr;
 }
 
-void Sema::actOnIndexSelector(Stmt *O, SelectorList &SelList, Expr *IdxE) {
+TypeDecl *Sema::actOnIndexSelector(Stmt *O, SelectorList &SelList, Expr *IdxE) {
    if (auto *ArrTy = dyn_cast<ArrayTypeDecl>(O)) {
       SelList.push_back(new IndexSelector(IdxE, ArrTy->getType()));
+      auto *BaseTy = ArrTy->getType();
+      if (isa<StructTypeDecl>(BaseTy) || isa<ArrayTypeDecl>(BaseTy))
+         return BaseTy;
    }
+   return nullptr;
 }
 
 Expr *Sema::actOnObjectExpr(Identifier &Id) {
@@ -321,13 +326,22 @@ void Sema::actOnStructFields(StructTypeDecl *StructD, StmtList &FieldStmts) {
    for (auto *Stm : FieldStmts) {
       if (auto *F = dyn_cast<Field>(Stm)) {
          if (!StructD->insertField(F)) {
-            llvm::outs() << F->getName() << " ";
+            llvm::errs() << F->getName() << " ";
             llvm_unreachable("field already exists");
          }
       }
       else
          llvm_unreachable("not a field inside struct");
    }
+}
+
+TypeDecl *Sema::actOnArrayTypeDecl(Decl *Ty, Expr *Num) { 
+   auto *I = cast<IntLiteral>(Num);
+   if (I->getValue() <= llvm::APSInt::get(0))
+      llvm_unreachable("array can't have length <=0");
+
+   auto *BaseTy = cast<TypeDecl>(Ty);
+   return new ArrayTypeDecl(nullptr, BaseTy->getLocation(), BaseTy->getName(), Num, BaseTy);
 }
 
 } // namespace llox

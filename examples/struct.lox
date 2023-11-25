@@ -1,14 +1,7 @@
 struct Point {
-   var x: double;
-   var y: double;
-};
-
-struct PONT {
-   var point: Point;
+   var p: double[3];
 };
 
 fun foo(a: double, b: double) : double {
-   var pont: PONT;
-   pont.point.x;
-   return a + b;
+   return 10;
 }

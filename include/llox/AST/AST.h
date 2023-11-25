@@ -769,7 +769,7 @@ class FieldSelector : public Selector {
 
 public:
    FieldSelector(uint Idx, StringRef Name, TypeDecl *Ty)
-      : Selector(SK_Index, Ty), Idx(Idx), Name(Name) {}
+      : Selector(SK_Field, Ty), Idx(Idx), Name(Name) {}
 
    const StringRef getName() const {
       return Name;
@@ -781,7 +781,7 @@ public:
 
 public:
    static bool classof(const Selector *S) {
-      return S->getKind() == SK_Index;
+      return S->getKind() == SK_Field;
    }
 };
 

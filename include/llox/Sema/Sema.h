@@ -17,6 +17,7 @@ namespace llox {
 class TypeChecker;
 
 class Sema {
+   Scope *GlobalScope;
    Scope *CurScope;
    Stmt *CurDecl;
    TypeChecker TyChecker;
@@ -70,8 +71,10 @@ public:
 
    void actOnSelectorList(Expr *O, SelectorList &SL);
    TypeDecl *actOnFieldSelector(Stmt *O, SelectorList &SelList, StringRef Name);
-   void actOnIndexSelector(Stmt *O, SelectorList &SelList, Expr *IdxE);
+   TypeDecl *actOnIndexSelector(Stmt *O, SelectorList &SelList, Expr *IdxE);
    Expr *actOnObjectExpr(Identifier &Id);
+
+   TypeDecl *actOnArrayTypeDecl(Decl *BaseTy, Expr *E);
 };
 
 } // namespace llox

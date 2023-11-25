@@ -287,8 +287,24 @@ bool Parser::parseTypeIdent(Decl *&D) {
    }
    if (CurTok.isNot(tok::identifier))
       return true;
-   D = Sem.actOnNameLookup(D, CurTok.getLocation(),  CurTok.getIdentifier());
+   Identifier Id {CurTok.getLocation(),  CurTok.getIdentifier()};
    nextToken();
+
+   D = Sem.actOnNameLookup(D, Id.first, Id.second);
+   if (!isa<TypeDecl>(D))
+      return true;
+
+   if (CurTok.is(tok::l_bracket)) {
+      nextToken();
+      Expr *Num;
+      if (parseExpr(Num))
+         return true;
+      if (!isa<IntLiteral>(Num))
+         return true;
+      D = Sem.actOnArrayTypeDecl(D, Num);
+      if (consumeToken(tok::r_bracket))
+         return true;
+   }
    return false;
 }
 
@@ -406,9 +422,9 @@ bool Parser::parseSelector(TypeDecl *Ty, SelectorList &SelList, TypeDecl *&RetTy
    else if (CurTok.is(tok::l_bracket)) {
       nextToken();
       Expr *IdxE = nullptr;
-      if (parseExpr(IdxE))
+      if (parsePrefixExpr(IdxE))
          return true;
-      Sem.actOnIndexSelector(Ty, SelList, IdxE);
+      RetTy = Sem.actOnIndexSelector(Ty, SelList, IdxE);
       if (consumeToken(tok::r_bracket))
          return true;
    }

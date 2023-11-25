@@ -206,10 +206,10 @@ static void print(const Selector *S) {
    if (auto *Sel = dyn_cast<FieldSelector>(S)) {
       llvm::outs() << "Field " << Sel->getName() << " [" << Sel->getIndex() << "] " << " <" << Sel->getType()->getName() << ">\n";
    }
-   // else if (auto *Sel = dyn_cast<IndexSelector>(S)) {
-   //    llvm::outs() << "Index ";
-   //    print(S->getIndex());
-   // }
+   else if (auto *Sel = dyn_cast<IndexSelector>(S)) {
+      llvm::outs() << "Index ";
+      print(Sel->getIndex());
+   }
 }
 
 static void print(const ParameterList &PL) {

@@ -38,6 +38,7 @@ static void print(const ParameterList &PL);
 static void print(const DeclList &DL);
 static void print(const StmtList &SL);
 static void print(const ExprList &EL);
+static void print(const SelectorList &SL);
 static void print(const Stmt *S);
 
 static void print(const Expr *E) {
@@ -78,14 +79,21 @@ static void print(const Expr *E) {
    else if (auto *Exp = dyn_cast<FunctionCallExpr>(E)) {
       const FunctionDecl *Func = Exp->getFunctionDecl();
       llvm::outs() << "FunctionCallExpr " << Func->getName() << " <"
-          << Func->getRetType()->getName() << "> \n";
+          << (Func->getRetType() ? Func->getRetType()->getName() : "nil") << "> \n";
       increaseIndentation();
       print(Exp->getParams());
       decreaseIndentation();
    }
    else if (auto *Exp = dyn_cast<ObjectExpr>(E)) {
-      llvm::outs() << "ObjectExpr ";
+      llvm::outs() << "ObjectExpr " << " <" << Exp->getType()->getName() << "> ";
       print(Exp->getObjectDecl());
+      if (Exp->getSelectors().size() <= 0) 
+         return;
+      printLine();
+      increaseIndentation();
+      print(Exp->getSelectors());
+      decreaseIndentation();
+      printLine();
    }
    else if (auto *Exp = dyn_cast<AssignmentExpr>(E)) {
       llvm::outs() << "AssignmentExpr \n";
@@ -103,8 +111,8 @@ static void print(const Stmt *S) {
    printSpaces();
 
    if (auto *Stm = dyn_cast<CompilationUnitDecl>(S)) {
-      llvm::outs() << "CompUnit\n";
-      printLine();
+      llvm::outs() << "CompUnit " << Stm->getStmts().size() << "\n";
+      printLine(); 
       print(Stm->getStmts());
       printLine();
    }
@@ -158,7 +166,7 @@ static void print(const Stmt *S) {
    }
    else if (auto *Stm = dyn_cast<FunctionDecl>(S)) {
       llvm::outs() << "FunctionDecl " << Stm->getName() << " <" 
-         << Stm->getRetType()->getName() << "> \n";
+         << (Stm->getRetType() ? Stm->getRetType()->getName() : "nil") << "> \n";
       printLine();
       increaseIndentation();
       print(Stm->getParams());
@@ -170,9 +178,38 @@ static void print(const Stmt *S) {
       llvm::outs() << "\n";
    }
    else if (auto *Stm = dyn_cast<GlobalTypeDecl>(S)) {
-      llvm::outs() << "GlobalTypeDecl" << Stm->getName() << "\n";
+      llvm::outs() << "GlobalTypeDecl " << Stm->getName() << "\n";
    }
+   else if (auto *Stm = dyn_cast<StructTypeDecl>(S)) {
+      llvm::outs() << "ClassTypeDecl " << Stm->getName() << "\n";
+      printLine();
+      increaseIndentation();
+      auto Fields = Stm->getFields();
+      for (auto &F : Fields) {
+         print(F.second.second);
+      }
+      decreaseIndentation();
+      printLine();
+   }
+   else if (auto *Stm = dyn_cast<Field>(S)) {
+      llvm::outs() << "Field " << Stm->getName() << " <" 
+         << Stm->getType()->getName() << "> " << Stm << "\n";
+   }
+}
 
+static void print(const Selector *S) {
+   if (!S)
+      return;
+
+   printSpaces();
+   
+   if (auto *Sel = dyn_cast<FieldSelector>(S)) {
+      llvm::outs() << "Field " << Sel->getName() << " [" << Sel->getIndex() << "] " << " <" << Sel->getType()->getName() << ">\n";
+   }
+   // else if (auto *Sel = dyn_cast<IndexSelector>(S)) {
+   //    llvm::outs() << "Index ";
+   //    print(S->getIndex());
+   // }
 }
 
 static void print(const ParameterList &PL) {
@@ -193,6 +230,11 @@ static void print(const StmtList &SL) {
 static void print(const ExprList &EL) {
    for (auto E : EL) 
       print(E);
+}
+
+static void print(const SelectorList &SL) {
+   for (auto S : SL)
+      print(S);
 }
 
 } // namespace llox

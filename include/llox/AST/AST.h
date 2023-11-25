@@ -1,8 +1,9 @@
 #ifndef LLOX_AST_AST_H
 #define LLOX_AST_AST_H
 
-#include <vector>
+#include <map>
 #include <string>
+#include <vector>
 
 #include "llox/Basic/LLVM.h"
 #include "llox/Basic/TokenKinds.h"
@@ -78,7 +79,7 @@ public:
       DK_CompUnit,
       DK_GlobalType,
       DK_ArrayType,
-      DK_ClassType,
+      DK_StructType,
       DK_TypeEnd,
       DK_End
    };
@@ -403,46 +404,46 @@ public:
 
 };
 
-
-class ClassTypeDecl : public TypeDecl {
-   FunctionDecl *Init;
-   StmtList Fields;
-   StmtList Methods;
-
-   ClassTypeDecl *SuperClassD;
+ class StructTypeDecl : public TypeDecl {
+   std::map<StringRef, std::pair<int, Stmt*>> Fields;
 
 public:
-   ClassTypeDecl(Stmt *EnclosingDecl, SMLoc Loc, StringRef Name)
-      : TypeDecl(DK_ClassType, EnclosingDecl, Loc, Name) {} 
+   StructTypeDecl(Stmt *EnclosingDecl, SMLoc Loc, StringRef Name)
+      : TypeDecl(DK_StructType, EnclosingDecl, Loc, Name) {}
 
-   ClassTypeDecl(Stmt *EnclosingDecl, SMLoc Loc, StringRef Name, 
-      FunctionDecl *Init, StmtList &Fields, StmtList &Methods, ClassTypeDecl *SuperD = nullptr)
-         : TypeDecl(DK_ClassType, EnclosingDecl, Loc, Name), 
-           Init(Init), Fields(Fields), Methods(Methods), SuperClassD(SuperD) {}
-
-   const FunctionDecl *getInit() const {
-      return Init;
+   bool insertField(Stmt *FS) {
+      if (auto *F = dyn_cast<Field>(FS)) {
+         auto It = Fields.find(F->getName());
+         if (It != Fields.end())
+            return false;
+         Fields[F->getName()] = {Fields.size(), F};
+         return true;
+      }
+      return false;
    }
 
-   const StmtList &getFields() const {
+   const std::map<StringRef, std::pair<int, Stmt*>> &getFields() const {
       return Fields;
    }
 
-   const StmtList &getMethods() const {
-      return Methods;
+   int getFieldIndex(StringRef Name) {
+      auto It = Fields.find(Name);
+      if (It == Fields.end())
+         return -1;
+      return It->second.first;
    }
 
-   ClassTypeDecl *getSuperClass() const {
-      return SuperClassD;
-   }
-
-   void setSuperClass(ClassTypeDecl *SuperD) {
-      SuperClassD = SuperD;
+   TypeDecl *getFieldType(StringRef Name) {
+      auto It = Fields.find(Name);
+      if (It == Fields.end())
+         return nullptr;
+      Field *F = cast<Field>(It->second.second);
+      return F->getType(); 
    }
 
 public:
    static bool classof(const Stmt *D) {
-      return D->getKind() == DK_ClassType;
+      return D->getKind() == DK_StructType;
    }
 };
 

@@ -163,13 +163,23 @@ Decl *Sema::actOnNameLookup(Stmt *Prev, SMLoc Loc, StringRef Name) {
    return nullptr;
 }
 
-void Sema::actOnVariableDecl(StmtList &Decls, Identifier Id, Decl *D) {
+bool Sema::actOnVariableDecl(StmtList &Decls, Identifier Id, Decl *D) {
    if (!CurScope)
       llvm_unreachable("no current scope");
-   
+
+
    if (TypeDecl *Ty = dyn_cast<TypeDecl>(D)) {
       SMLoc Loc = Id.first;
-      StringRef Name = Id.second;
+      StringRef Name = Id.second; 
+
+      if (auto *CD = cast_or_null<Decl>(CurDecl)) {
+         if (isa<StructTypeDecl>(CD)) {
+             Field *F = new Field(Loc, Name, Ty);
+            Decls.push_back(F);
+            return true;
+         }
+      }
+
       VariableDecl *Decl = new VariableDecl(CurDecl, Loc, Name, Ty);
       if (CurScope->insert(Decl))
          Decls.push_back(Decl);
@@ -178,6 +188,7 @@ void Sema::actOnVariableDecl(StmtList &Decls, Identifier Id, Decl *D) {
    }
    else 
       llvm_unreachable("no such type in var decl");
+   return false;
 }
 
 Expr *Sema::actOnIntLiteral(SMLoc Loc, StringRef Literal) {
@@ -226,7 +237,6 @@ Expr *Sema::actOnInfixExpr(Expr *Left, Expr *Right, const OperatorInfo &Op) {
    if (!Right)
       return Left;
 
-   llvm::outs() << Left->getType()->getName() << " " << Right->getType()->getName() << "\n";
    TypeDecl *Ty = TyChecker.getInfixTy(Left->getType(), Right->getType());
    if (!Ty)
       llvm_unreachable("incompatible types");
@@ -258,27 +268,32 @@ Expr *Sema::actOnFunctionCallExpr(Identifier &FunId, ExprList &ParamExprs) {
    return nullptr;
 }
 
-void Sema::actOnFieldSelector(Expr *O, SMLoc Loc, StringRef Name) {
+void Sema::actOnSelectorList(Expr *O, SelectorList &SL) {
    if (auto *ObjE = dyn_cast<ObjectExpr>(O)) {
-      if (auto *ClassTy = dyn_cast<ClassTypeDecl>(ObjE->getType())) {
-         uint Idx = 0;
-         for (const auto &FieldS : ClassTy->getFields()) {
-            auto *F = cast<Field>(FieldS);
-            if (Name == F->getName()) {
-               ObjE->addSelector(new FieldSelector(Idx, Name, F->getType()));
-               return;
-            }
-            ++Idx;
-         }
-      }
+      ObjE->setType(SL.back()->getType());
+      ObjE->setSelectors(SL);
    }
+   else
+      llvm_unreachable("selector can't be used on global type");
 }
 
-void Sema::actOnIndexSelector(Expr *O, SMLoc Loc, Expr *IdxE) {
-   if (auto *ObjE = dyn_cast<ObjectExpr>(O)) {
-      if (auto *ArrTy = dyn_cast<ArrayTypeDecl>(ObjE->getType())) {
-         ObjE->addSelector(new IndexSelector(IdxE, ArrTy->getType()));
-      }
+TypeDecl *Sema::actOnFieldSelector(Stmt *O, SelectorList &SelList, StringRef Name) {
+   if (auto *StructTy = dyn_cast<StructTypeDecl>(O)) {
+      int Idx = StructTy->getFieldIndex(Name);
+      if (Idx < 0)
+         llvm_unreachable("no such field in struct");
+      TypeDecl *FieldTy = StructTy->getFieldType(Name);
+      SelList.push_back(new FieldSelector(Idx, Name, FieldTy));
+
+      if (auto *Ty = dyn_cast<StructTypeDecl>(FieldTy))
+         return Ty;
+   }
+   return nullptr;
+}
+
+void Sema::actOnIndexSelector(Stmt *O, SelectorList &SelList, Expr *IdxE) {
+   if (auto *ArrTy = dyn_cast<ArrayTypeDecl>(O)) {
+      SelList.push_back(new IndexSelector(IdxE, ArrTy->getType()));
    }
 }
 
@@ -294,20 +309,25 @@ Expr *Sema::actOnObjectExpr(Identifier &Id) {
    return nullptr;
 }
 
-ClassTypeDecl *Sema::actOnClassDecl(Identifier &Id, ClassTypeDecl *SuperD) {
-   ClassTypeDecl *ClassD = new ClassTypeDecl(CurDecl, Id.first, Id.second);
-   ClassD->setSuperClass(SuperD);
-   if (!CurScope->insert(ClassD))
+StructTypeDecl *Sema::actOnStructDecl(StmtList &Decls, Identifier &Id) {
+   StructTypeDecl *StructD = new StructTypeDecl(CurDecl, Id.first, Id.second);
+   if (!CurScope->insert(StructD))
       llvm_unreachable("Redeclaration of class");
-
-   return ClassD;
+   Decls.push_back(StructD);
+   return StructD;
 }
 
-// void Sema::actOnClassInit(ClassTypeDecl *ClassD, FunctionDecl *Init) {
-//    FieldList Fields;
-
-//    StmtList InitStmts = Init->getStmts();
-//    for (VariableDecl)
-// }
+void Sema::actOnStructFields(StructTypeDecl *StructD, StmtList &FieldStmts) {
+   for (auto *Stm : FieldStmts) {
+      if (auto *F = dyn_cast<Field>(Stm)) {
+         if (!StructD->insertField(F)) {
+            llvm::outs() << F->getName() << " ";
+            llvm_unreachable("field already exists");
+         }
+      }
+      else
+         llvm_unreachable("not a field inside struct");
+   }
+}
 
 } // namespace llox

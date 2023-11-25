@@ -43,14 +43,18 @@ op::OperatorPrec Parser::getUnOperatorPrec() {
 
 CompilationUnitDecl *Parser::parse() {
    CompilationUnitDecl *CompUnit = nullptr;
-   parseCompilationUnit(CompUnit);
+   if (parseCompilationUnit(CompUnit))
+      llvm_unreachable("Parsing error\n");
    return CompUnit;
 }
 
 bool Parser::parseCompilationUnit(CompilationUnitDecl *&CompUnit) {
    CompUnit = Sem.actOnCompilationUnit("COMPUNIT");
    Sem.enterScope(CompUnit);
-   
+
+   if (CurTok.is(tok::eof))
+      return false;
+
    StmtList Stmts;
    if (parseStmtList(Stmts))
       return true;
@@ -60,18 +64,11 @@ bool Parser::parseCompilationUnit(CompilationUnitDecl *&CompUnit) {
    return false;
 }
 
-bool Parser::validStmtDelimiter(StmtList &Stmts) {
-   // If, While, For, Block, Function ends with }; other stmts with ;
-   Stmt *S = Stmts.back();
-   return isa<IfStmt>(S) || isa<WhileStmt>(S)  || isa<BlockStmt>(S) 
-      || isa<FunctionDecl>(S) || consumeToken(tok::semicolon);
-}
-
 bool Parser::parseStmtList(StmtList &Stmts) {
    if (parseStmt(Stmts))
       return true;
 
-   while (CurTok.isNot(tok::eof) && validStmtDelimiter(Stmts)) {
+   while (!CurTok.is(tok::eof)) {
       if (parseStmt(Stmts))
          return true;
    }
@@ -163,14 +160,17 @@ bool Parser::parseReturnStmt(StmtList &Stmts) {
       return true;
    
    Sem.actOnReturnStmt(Stmts, E);
+
+   if (consumeToken(tok::semicolon))
+      return true;
+
    return false;
 }
 
 bool Parser::parseBracedStmts(StmtList &Stmts) {
    if (consumeToken(tok::l_brace))
       return true;
-   
-   while (CurTok.isNot(tok::eof) && CurTok.isNot(tok::r_brace)) {
+   while (CurTok.isNot(tok::r_brace)) {
       if (parseStmt(Stmts))
          return true;
    }
@@ -210,6 +210,8 @@ bool Parser::parseDecl(StmtList &Decls) {
       return parseVariableDecl(Decls);
    case tok::kw_fun:
       return parseFunctionDecl(Decls);
+   case tok::kw_struct:
+      return parseStructDecl(Decls);
    default:
       break;
    }
@@ -219,12 +221,8 @@ bool Parser::parseDecl(StmtList &Decls) {
 bool Parser::parseVariableDecl(StmtList &Decls) {
    if (consumeToken(tok::kw_var))
       return true;
-   if (!CurTok.isOneOf({tok::identifier, tok::kw_this}))
+   if (!CurTok.is(tok::identifier))
       return true;
-   
-   if (CurTok.is(tok::kw_this)) {
-      return parseField(Decls);
-   }
    
    Identifier VarId {CurTok.getLocation(), CurTok.getIdentifier()};
    nextToken();
@@ -236,7 +234,12 @@ bool Parser::parseVariableDecl(StmtList &Decls) {
    if (parseTypeIdent(Ty))
       return true;
 
-   Sem.actOnVariableDecl(Decls, VarId, Ty);
+   // if actOnVariableDecl -> true -> parsed field -> finished
+   if (Sem.actOnVariableDecl(Decls, VarId, Ty)) {
+      if (consumeToken(tok::semicolon))
+         return true;
+      return false;
+   }
    
    if (CurTok.is(tok::equal)) {
       nextToken();
@@ -252,77 +255,36 @@ bool Parser::parseVariableDecl(StmtList &Decls) {
    return false;
 }
 
-bool Parser::parseField(StmtList &Decls) {
-   if (consumeToken(tok::kw_this) || consumeToken(tok::dot))
+bool Parser::parseStructDecl(StmtList &Decls) {
+   if (consumeToken(tok::kw_struct))
       return true;
-
    if (CurTok.isNot(tok::identifier))
       return true;
-
-   Identifier FieldId {CurTok.getLocation(), CurTok.getIdentifier()};
+   Identifier Id {CurTok.getLocation(), CurTok.getIdentifier()};
    nextToken();
+   StructTypeDecl *StructD = Sem.actOnStructDecl(Decls, Id);
+ 
+   Sem.enterScope(StructD);
 
-   if (consumeToken(tok::colon))
-      return true;
-
-   Decl *Ty;
-   if (parseTypeIdent(Ty))
+   StmtList FieldStmts;
+   if (parseBracedStmts(FieldStmts))
       return true;   
-
-   // Sem.actOnField(Decls, FieldId, Ty);
-   return false;
-}
-
-bool Parser::parseClassDecl(StmtList &Decls) {
-   if (consumeToken(tok::kw_class))
-      return true;
-   if (CurTok.isNot(tok::identifier))
-      return true;
-   Identifier ClassId {CurTok.getLocation(), CurTok.getIdentifier()};
-   nextToken();
-
-
-   ClassTypeDecl *ClassD = nullptr;
-   // class Klass < SuperKlass
-   if (CurTok.is(tok::less)) {
-      nextToken();
-      Decl *SuperD;
-      if (parseTypeIdent(SuperD))
-         return true;
-      if (auto *Super = dyn_cast<ClassTypeDecl>(SuperD))
-         ClassD = Sem.actOnClassDecl(ClassId, Super);
-   }
-   
-   if (consumeToken(tok::l_brace))
-      return true;
-
-   // add init method and fields
-   Sem.enterScope(ClassD);
-
-   FunctionDecl *Init = nullptr;
-   StmtList InitStmt;
-   if (CurTok.is(tok::kw_fun)) {
-      if (parseFunctionDecl(InitStmt))
-         return true;
-      Init = cast<FunctionDecl>(InitStmt.front());  
-   }
-   // Sem.actOnClassInit(ClassD, Init); // here must happen fields creating
-
-   StmtList Methods;
-   while (CurTok.is(tok::kw_fun)) {
-      if (parseFunctionDecl(Methods))
-         return true;
-   }
-   // Sem.actOnClassMethods(Class, Methods);
+   Sem.actOnStructFields(StructD, FieldStmts);
 
    Sem.leaveScope();
+
+   if (consumeToken(tok::semicolon))
+         return true;
+
    return false;
 } 
 
 bool Parser::parseTypeIdent(Decl *&D) {
    D = nullptr;
-   if (CurTok.is(tok::kw_nil))
+   if (CurTok.is(tok::kw_nil)) {
+      nextToken();
       return false;
+   }
    if (CurTok.isNot(tok::identifier))
       return true;
    D = Sem.actOnNameLookup(D, CurTok.getLocation(),  CurTok.getIdentifier());
@@ -430,28 +392,47 @@ bool Parser::parseExprList(ExprList &Exprs) {
    return false;
 }
 
-bool Parser::parseSelector(Expr *&E) {
+bool Parser::parseSelector(TypeDecl *Ty, SelectorList &SelList, TypeDecl *&RetTy) {
    if (!CurTok.isOneOf({tok::dot, tok::l_bracket}))
       return true;
-
+   
    if (CurTok.is(tok::dot)) {
       nextToken();
       if (!CurTok.is(tok::identifier))
          return true;
-      Sem.actOnFieldSelector(E, CurTok.getLocation(), CurTok.getIdentifier());
+      RetTy = Sem.actOnFieldSelector(Ty, SelList, CurTok.getIdentifier());
       nextToken();
    }
    else if (CurTok.is(tok::l_bracket)) {
-      SMLoc Loc = CurTok.getLocation();
       nextToken();
       Expr *IdxE = nullptr;
       if (parseExpr(IdxE))
          return true;
-      Sem.actOnIndexSelector(E, Loc, IdxE);
+      Sem.actOnIndexSelector(Ty, SelList, IdxE);
       if (consumeToken(tok::r_bracket))
          return true;
    }
    return false;
+}
+
+bool Parser::parseSelectorList(Expr *O) {
+   if (!CurTok.isOneOf({tok::dot, tok::l_bracket}))
+      return true;
+
+   TypeDecl *RetTy = nullptr;
+   SelectorList SL;   
+
+   if (auto *ObjE = dyn_cast<ObjectExpr>(O)) {
+      if (parseSelector(ObjE->getType(), SL, RetTy))
+         return true;
+   }
+
+   while (RetTy) {
+      if (parseSelector(RetTy, SL, RetTy))
+         return true;
+   }
+
+   Sem.actOnSelectorList(O, SL);
 }
 
 bool Parser::parseIdentifierExpr(Expr *&E) {
@@ -462,9 +443,14 @@ bool Parser::parseIdentifierExpr(Expr *&E) {
    nextToken();
    if (CurTok.isNot(tok::l_paren)) {
       E = Sem.actOnObjectExpr(Id);
+      if (CurTok.isOneOf({tok::l_bracket, tok::dot})) {
+         if (parseSelectorList(E))
+            return true;
+      } 
       return false;
    }
    nextToken();
+
 
    ExprList ParamExprs;
    if (parseExprList(ParamExprs))
@@ -522,7 +508,6 @@ bool Parser::parseBoolLiteral(Expr *&E) {
    }
    return true;
 }
-
 
 bool Parser::parsePrimary(Expr *&E) {
    switch (CurTok.getKind()) {

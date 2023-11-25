@@ -1,5 +1,5 @@
 ## llox = LLVM + lox
-Lox lang is a lang from Crafting Interpreters.
+Lox lang is a lang from Crafting Interpreters however this is
 
 ## TODO:
 
@@ -31,31 +31,6 @@ fun foo(a: int, b: int) : int {
 }
 
 var arr: int[5]; // we'll also add static arrays
-
-class Point {
-  fn init(x: double, y: double) : nil {
-    var this.x = x;
-    var this.y = y;
-  }
-
-  fn getDistanceSquared(B: Point) : double {
-    dx: double = this.x - B.x;
-    dy: double = this.y - B.y;
-    dist: double = dx * dx + dy * dy;
-    return dist;
-  }
-};
-
-fun main() -> int {
-  P1: Point = Point(2, 2);
-  P2: Point = Point(0, 0);
-  print(P1.getDisanceSquared(P2))
-  return 0;
-}
-```
-
-```
-var a, b: int = 5, 6; // DO WE NEED THIS?
 ```
 
 Grammar from original language:

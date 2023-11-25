@@ -49,7 +49,8 @@ public:
    void actOnBlockStmt(BlockStmt *Block, StmtList &BlockStmts);
    void actOnExprStmt(StmtList &Stmts, Expr *E);
    void *actOnAssignmentInit(StmtList &Decls, Expr *E);
-   ClassTypeDecl *actOnClassDecl(Identifier &Id, ClassTypeDecl *SuperD);
+   StructTypeDecl *actOnStructDecl(StmtList &Decls, Identifier &Id);
+   void actOnStructFields(StructTypeDecl *StructD, StmtList &FieldStmts);
 
    Expr *actOnAssignmentExpr(Expr *Left, Expr *Right);
    FunctionDecl *actOnFunctionDecl(SMLoc Loc, StringRef Name);
@@ -57,7 +58,8 @@ public:
    void actOnFunctionBlock(StmtList &Decls, FunctionDecl *FunDecl, StmtList &FunStmts);
    void actOnFunctionParameters(ParameterList &Params, IdentList &ParIds, StmtList &ParTypes);
    Decl *actOnNameLookup(Stmt *Prev, SMLoc Loc, StringRef Name);
-   void actOnVariableDecl(StmtList &Decls, Identifier Id, Decl *D);
+   bool actOnVariableDecl(StmtList &Decls, Identifier Id, Decl *D);
+   void actOnField(StmtList &Stmts, Identifier &Id, Decl *Ty);
    Expr *actOnDoubleLiteral(SMLoc Loc, StringRef Literal);
    Expr *actOnIntLiteral(SMLoc Loc, StringRef Literal);
    Expr *actOnBoolLiteral(tok::TokenKind K);
@@ -65,8 +67,10 @@ public:
    Expr *actOnInfixExpr(Expr *Left, Expr *Right, const OperatorInfo &Op);
    Expr *actOnPrefixExpr(Expr *E, const OperatorInfo &Op);
    Expr *actOnFunctionCallExpr(Identifier &FunId, ExprList &ParamExprs);
-   void actOnFieldSelector(Expr *O, SMLoc Loc, StringRef Name);
-   void actOnIndexSelector(Expr *O, SMLoc Loc, Expr *IdxE);
+
+   void actOnSelectorList(Expr *O, SelectorList &SL);
+   TypeDecl *actOnFieldSelector(Stmt *O, SelectorList &SelList, StringRef Name);
+   void actOnIndexSelector(Stmt *O, SelectorList &SelList, Expr *IdxE);
    Expr *actOnObjectExpr(Identifier &Id);
 };
 

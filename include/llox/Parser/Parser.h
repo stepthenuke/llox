@@ -33,20 +33,19 @@ public:
    OperatorPrec getBinOperatorPrec();
    OperatorPrec getUnOperatorPrec();
 
-   bool validStmtDelimiter(StmtList &Stmts);
-
    bool parseCompilationUnit(CompilationUnitDecl *&CompUnit);
    bool parseDecl(StmtList &Decls);
    bool parseVariableDecl(StmtList &Decls);
    bool parseField(StmtList &Decls);
    bool parseTypeIdent(Decl *&D);
-   bool parseClassDecl(StmtList &Decls);
+   bool parseStructDecl(StmtList &Decls);
    bool parseFunctionParameter(IdentList &ParIds, StmtList &ParTypes);
    bool parseFunctionParameterList(ParameterList &Params);
    bool parseBlock(StmtList &Decls, StmtList &Stmts);
    bool parseFunctionDecl(StmtList &Decls);
    bool parseExprList(ExprList &Exprs);
-   bool parseSelector(Expr *&E);
+   bool parseSelector(TypeDecl *Ty, SelectorList &SelList, TypeDecl *&RetTy);
+   bool parseSelectorList(Expr *O);
    bool parseIdentifierExpr(Expr *&E);
    bool parseStringLiteral(Expr *&E);
    bool parseParenExpr(Expr *&E);

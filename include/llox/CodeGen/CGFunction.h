@@ -50,6 +50,10 @@ private:
    void emit(const BlockStmt *Stm);
    void emit(const ExprStmt *Stm);
 
+   void castValue(llvm::Value *&Val, llvm::Type *TyTo);
+   llvm::Value *createDoubleOp(llvm::Value *Left, llvm::Value *Right, tok::TokenKind OpKind);
+   llvm::Value *createIntOp(llvm::Value *Left, llvm::Value *Right, tok::TokenKind OpKind);
+   llvm::Value *createBoolOp(llvm::Value *Left, llvm::Value *Right, tok::TokenKind OpKind);
    llvm::Value *emit(const InfixExpr *Exp);
    llvm::Value *emit(const PrefixExpr *Exp);
    llvm::Value *emit(const FunctionCallExpr *Exp);

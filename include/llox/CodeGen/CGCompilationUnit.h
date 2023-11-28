@@ -16,7 +16,7 @@ class CGCompilationUnit {
 public:
    llvm::Type *VoidTy;
    llvm::Type *Int1Ty;
-   llvm::Type *Int32Ty;
+   llvm::Type *Int64Ty;
    llvm::Type *DoubleTy;
 
 public:

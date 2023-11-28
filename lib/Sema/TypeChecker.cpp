@@ -11,6 +11,9 @@ bool TypeChecker::checkOperatorType(tok::TokenKind OpKind, TypeDecl *Ty) {
    case tok::equal:
    case tok::bang_equal:
    case tok::equal_equal:
+   case tok::bang:
+   case tok::kw_and:
+   case tok::kw_or:
       return Ty == Sem->getBool() || Ty == Sem->getInt() || Ty == Sem->getDouble();
    case tok::greater:
    case tok::greater_equal:
@@ -21,10 +24,6 @@ bool TypeChecker::checkOperatorType(tok::TokenKind OpKind, TypeDecl *Ty) {
    case tok::star:
    case tok::slash:
       return Ty == Sem->getDouble() || Ty == Sem->getInt();
-   case tok::bang:
-   case tok::kw_and:
-   case tok::kw_or:
-      return Ty == Sem->getBool();
    default:
       break;
    }
@@ -43,11 +42,11 @@ bool TypeChecker::checkAssignmentTypes(TypeDecl *Ty1, TypeDecl *Ty2) {
 }
 
 TypeDecl *TypeChecker::getInfixTy(TypeDecl *Ty1, TypeDecl *Ty2) {
+   if (Ty1 == Sem->getBool() || Ty2 == Sem->getBool())
+      return Sem->getBool();
+   
    if ((Ty1 == Sem->getInt() && Ty2 == Sem->getDouble()) || (Ty1 == Sem->getDouble() && Ty2 == Sem->getInt()))
       return Sem->getDouble();
-
-   if (Ty1 == Sem->getBool() && Ty1 == Ty2)
-      return Ty1;
 
    if (Ty1 == Sem->getDouble() && Ty1 == Ty2)
       return Ty1;

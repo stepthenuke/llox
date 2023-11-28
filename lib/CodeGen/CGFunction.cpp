@@ -144,6 +144,7 @@ void CGFunction::emit(const IfStmt *Stm) {
    llvm::BasicBlock *ContIfBB = llvm::BasicBlock::Create(CGCUnit.getLLVMContext(), "cont.if", Fn);
 
    llvm::Value *Cond = emit(Stm->getCond());
+   castValue(Cond, CGCUnit.Int1Ty);
    Builder.CreateCondBr(Cond, IfBB, ElseFlag ? ElseBB : ContIfBB);
 
    setCurBlock(IfBB);
@@ -169,6 +170,7 @@ void CGFunction::emit(const WhileStmt* Stm) {
    Builder.CreateBr(WhileCondBB);
    setCurBlock(WhileCondBB);
    llvm::Value *Cond = emit(Stm->getCond());
+   castValue(Cond, CGCUnit.Int1Ty);
    Builder.CreateCondBr(Cond, WhileBodyBB, ContWhileBB);
 
    setCurBlock(WhileBodyBB);
@@ -203,8 +205,9 @@ llvm::Value *CGFunction::emit(const Expr *Exp) {
       return llvm::ConstantFP::get(CGCUnit.DoubleTy, E->getValue());
    else if (auto *E = dyn_cast<BoolLiteral>(Exp))
       return llvm::ConstantInt::get(CGCUnit.Int1Ty, E->getValue());
-   else if (auto *E = dyn_cast<IntLiteral>(Exp))
-      return llvm::ConstantInt::get(CGCUnit.Int32Ty, E->getValue());
+   else if (auto *E = dyn_cast<IntLiteral>(Exp)) {
+      return llvm::ConstantInt::get(CGCUnit.Int64Ty, E->getValue());
+   }
    else if (auto *E = dyn_cast<InfixExpr>(Exp))
       return emit(E);
    else if (auto *E = dyn_cast<PrefixExpr>(Exp))
@@ -218,51 +221,130 @@ llvm::Value *CGFunction::emit(const Expr *Exp) {
    return nullptr;
 }
 
-llvm::Value *CGFunction::emit(const InfixExpr *Exp) {
-   auto *Left = emit(Exp->getLeft());
-   auto *Right = emit(Exp->getRight());
-   llvm::Value *Result = nullptr;
+void CGFunction::castValue(llvm::Value *&Val, llvm::Type *DestTy) {
+   if (Val->getType() == DestTy)
+      return;
 
-   switch (Exp->getOperatorInfo().getKind()) {
+   if (Val->getType() == CGCUnit.Int64Ty && DestTy == CGCUnit.DoubleTy) {
+      Val = Builder.CreateCast(llvm::Instruction::SIToFP, Val, DestTy);
+      return;
+   }
+
+   if (Val->getType() == CGCUnit.Int64Ty && DestTy == CGCUnit.Int1Ty) {
+      Val = Builder.CreateICmpNE(Val, llvm::ConstantInt::get(CGCUnit.Int64Ty, 0, true));
+      return;
+   }
+   
+   if (Val->getType() == CGCUnit.DoubleTy && DestTy == CGCUnit.Int1Ty) {
+      Val = Builder.CreateFCmpONE(Val, llvm::ConstantFP::get(CGCUnit.DoubleTy, 0));
+      return;
+   }
+}
+
+llvm::Value *CGFunction::createDoubleOp(llvm::Value *Left, llvm::Value *Right, tok::TokenKind OpKind) {
+   switch (OpKind) {
    case tok::plus:
-      Result = Builder.CreateFAdd(Left, Right);
+      return Builder.CreateFAdd(Left, Right);
       break;
    case tok::minus:
-      Result = Builder.CreateFSub(Left, Right);
+      return Builder.CreateFSub(Left, Right);
       break;
    case tok::star:
-      Result = Builder.CreateFMul(Left, Right);
+      return Builder.CreateFMul(Left, Right);
       break;
    case tok::slash:
-      Result = Builder.CreateFDiv(Left, Right);
+      return Builder.CreateFDiv(Left, Right);
       break;
    case tok::equal_equal:
-      Result = Builder.CreateFCmpOEQ(Left, Right);
+      return Builder.CreateFCmpOEQ(Left, Right);
       break;
    case tok::bang_equal:
-      Result = Builder.CreateFCmpONE(Left, Right);
+      return Builder.CreateFCmpONE(Left, Right);
       break;
    case tok::less:
-      Result = Builder.CreateFCmpOLT(Left, Right);
+      return Builder.CreateFCmpOLT(Left, Right);
       break;
    case tok::less_equal:
-      Result = Builder.CreateFCmpOLE(Left, Right);
+      return Builder.CreateFCmpOLE(Left, Right);
       break;
    case tok::greater:
-      Result = Builder.CreateFCmpOGT(Left, Right);
+      return Builder.CreateFCmpOGT(Left, Right);
       break;
    case tok::greater_equal:
-      Result = Builder.CreateFCmpOGE(Left, Right);
-      break;
-   case tok::kw_and:
-      Result = Builder.CreateAnd(Left, Right);
-      break;
-   case tok::kw_or:
-      Result = Builder.CreateOr(Left, Right);
+      return Builder.CreateFCmpOGE(Left, Right);
       break;
    default:
       llvm_unreachable("wrong operator");
    }
+}
+
+llvm::Value *CGFunction::createIntOp(llvm::Value *Left, llvm::Value *Right, tok::TokenKind OpKind) {
+   switch (OpKind) {
+   case tok::plus:
+      return Builder.CreateNSWAdd(Left, Right);
+      break;
+   case tok::minus:
+      return Builder.CreateNSWSub(Left, Right);
+      break;
+   case tok::star:
+      return Builder.CreateNSWMul(Left, Right);
+      break;
+   case tok::slash:
+      return Builder.CreateSDiv(Left, Right);
+      break;
+   case tok::equal_equal:
+      return Builder.CreateICmpEQ(Left, Right);
+      break;
+   case tok::bang_equal:
+      return Builder.CreateICmpNE(Left, Right);
+      break;
+   case tok::less:
+      return Builder.CreateICmpSLT(Left, Right);
+      break;
+   case tok::less_equal:
+      return Builder.CreateICmpSLE(Left, Right);
+      break;
+   case tok::greater:
+      return Builder.CreateICmpSGT(Left, Right);
+      break;
+   case tok::greater_equal:
+      return Builder.CreateICmpSGE(Left, Right);
+      break;
+   default:
+      llvm_unreachable("wrong operator");
+   }
+}
+
+llvm::Value *CGFunction::createBoolOp(llvm::Value *Left, llvm::Value *Right, tok::TokenKind OpKind) {
+   switch (OpKind) {
+   case tok::kw_and:
+      return Builder.CreateAnd(Left, Right);
+      break;
+   case tok::kw_or:
+      return Builder.CreateOr(Left, Right);
+      break;
+   default:
+      llvm_unreachable("wrong operator");
+   }
+}
+
+llvm::Value *CGFunction::emit(const InfixExpr *Exp) {
+   // cast here and then -> to op
+   auto *Left = emit(Exp->getLeft());
+   auto *Right = emit(Exp->getRight());
+   auto *ResultTy = getLLVMType(Exp->getType());
+   castValue(Left, ResultTy);
+   castValue(Right, ResultTy);
+   llvm::Value *Result = nullptr;
+
+   tok::TokenKind OpKind = Exp->getOperatorInfo().getKind();
+
+   if (ResultTy == CGCUnit.DoubleTy)
+      Result = createDoubleOp(Left, Right, OpKind);
+   else if (ResultTy == CGCUnit.Int64Ty)
+      Result = createIntOp(Left, Right, OpKind);
+   else if (ResultTy == CGCUnit.Int1Ty)
+      Result = createBoolOp(Left, Right, OpKind);
 
    return Result;
 }
@@ -271,9 +353,13 @@ llvm::Value *CGFunction::emit(const PrefixExpr *Exp) {
    llvm::Value *Result = emit(Exp->getExpr());
    switch (Exp->getOperatorInfo().getKind()) {
    case tok::minus:
-      Result = Builder.CreateFNeg(Result);
+      if (Result->getType() == CGCUnit.DoubleTy)
+         Result = Builder.CreateFNeg(Result);
+      else if (Result->getType() == CGCUnit.Int64Ty)
+         Result = Builder.CreateNSWNeg(Result);
       break;
    case tok::bang:
+      castValue(Result, CGCUnit.Int1Ty);
       Result = Builder.CreateNot(Result);
       break;
    default:
@@ -315,13 +401,13 @@ llvm::Value *CGFunction::GEPObject(const ObjectExpr *O) {
       return Def;
 
    llvm::SmallVector<llvm::Value*, 8> Indeces;
-   Indeces.push_back(llvm::ConstantInt::get(CGCUnit.Int32Ty, 0));
+   Indeces.push_back(llvm::ConstantInt::get(CGCUnit.Int64Ty, 0));
    for (auto *Sel : Selectors) {
       if (auto *IdxSel = llvm::dyn_cast<IndexSelector>(Sel)) {
          Indeces.push_back(emit(IdxSel->getIndex()));
       }
       else if (auto *FieldSel = llvm::dyn_cast<FieldSelector>(Sel)) {
-         llvm::Value *V = llvm::ConstantInt::get(CGCUnit.Int32Ty, FieldSel->getIndex());
+         llvm::Value *V = llvm::ConstantInt::get(CGCUnit.Int64Ty, FieldSel->getIndex());
          Indeces.push_back(V);
       }
       else 
@@ -335,6 +421,7 @@ llvm::Value *CGFunction::GEPObject(const ObjectExpr *O) {
 
 llvm::Value *CGFunction::emit(const AssignmentExpr *Exp) {
    llvm::Value *Val = emit(Exp->getExpr()); 
+   castValue(Val, getLLVMType(Exp->getObject()->getType())); // ???
    writeVariable(Exp->getObject(), Val);
    return Val;
 }

@@ -57,7 +57,7 @@ public:
    FunctionDecl *actOnFunctionDecl(SMLoc Loc, StringRef Name);
    void actOnFunctionParamList(FunctionDecl *FunDecl, ParameterList &Params, Decl *RetTy);
    void actOnFunctionBlock(StmtList &Decls, FunctionDecl *FunDecl, StmtList &FunStmts);
-   void actOnFunctionParameters(ParameterList &Params, IdentList &ParIds, StmtList &ParTypes);
+   void actOnFunctionParameters(ParameterList &Params, IdentList &ParIds, StmtList &ParTypes, llvm::SmallVector<bool, 8> &VarFlags);
    Decl *actOnNameLookup(Stmt *Prev, SMLoc Loc, StringRef Name);
    bool actOnVariableDecl(StmtList &Decls, Identifier Id, Decl *D);
    void actOnField(StmtList &Stmts, Identifier &Id, Decl *Ty);

@@ -85,7 +85,10 @@ static void print(const Expr *E) {
       decreaseIndentation();
    }
    else if (auto *Exp = dyn_cast<ObjectExpr>(E)) {
-      llvm::outs() << "ObjectExpr " << " <" << Exp->getType()->getName() << "> ";
+      llvm::outs() << "ObjectExpr " << " <";
+      if (auto *Ty = dyn_cast<ArrayTypeDecl>(E->getType()))
+         llvm::outs() << "array ";
+      llvm::outs() << Exp->getType()->getName() << ">";
       print(Exp->getObjectDecl());
       if (Exp->getSelectors().size() <= 0) 
          return;
@@ -157,12 +160,16 @@ static void print(const Stmt *S) {
       decreaseIndentation();
    }
    else if (auto *Stm = dyn_cast<VariableDecl>(S)) {
-      llvm::outs() << "VariableDecl " << Stm->getName() << " <" 
-         << Stm->getType()->getName() << "> " << Stm << "\n";
+      llvm::outs() << "VariableDecl " << Stm->getName() << " <";
+      if (auto *Ty = dyn_cast<ArrayTypeDecl>(Stm->getType()))
+         llvm::outs() << "array ";
+      llvm::outs() << Stm->getType()->getName() << "> " << Stm << "\n";
    }
    else if (auto *Stm = dyn_cast<ParameterDecl>(S)) {
-      llvm::outs() << "ParameterDecl " << Stm->getName() << " <" 
-         << Stm->getType()->getName() << "> " << Stm << "\n"; 
+      llvm::outs() << "ParameterDecl " << Stm->getName() << " isVar:" << Stm->isVar() << " <";
+      if (isa<ArrayTypeDecl>(Stm->getType()))
+         llvm::outs() << "array ";
+      llvm::outs() << Stm->getType()->getName() << "> " << Stm << "\n"; 
    }
    else if (auto *Stm = dyn_cast<FunctionDecl>(S)) {
       llvm::outs() << "FunctionDecl " << Stm->getName() << " <" 
@@ -192,8 +199,10 @@ static void print(const Stmt *S) {
       printLine();
    }
    else if (auto *Stm = dyn_cast<Field>(S)) {
-      llvm::outs() << "Field " << Stm->getName() << " <" 
-         << Stm->getType()->getName() << "> " << Stm << "\n";
+      llvm::outs() << "Field " << Stm->getName() << " <" ;
+      if (isa<ArrayTypeDecl>(Stm->getType()))
+         llvm::outs() << "array ";
+      llvm::outs() << Stm->getType()->getName() << "> " << Stm << "\n";
    }
 }
 

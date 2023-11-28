@@ -99,12 +99,12 @@ int main(int argc_, char **argv_) {
       CompilationUnitDecl *CompUnit = Par.parse();
       print(CompUnit);
 
-      // llvm::TargetMachine *TM = createTargetMachine();
-      // llvm::LLVMContext Context;
-      // if (CodeGenerator *CG = CodeGenerator::create(Context, TM)) {
-      //    std::unique_ptr<llvm::Module> M = CG->run(CompUnit, F);
-      //    delete CG;
-      // }
+      llvm::TargetMachine *TM = createTargetMachine();
+      llvm::LLVMContext Context;
+      if (CodeGenerator *CG = CodeGenerator::create(Context, TM)) {
+         std::unique_ptr<llvm::Module> M = CG->run(CompUnit, F);
+         delete CG;
+      }
    }
 
    return 0;

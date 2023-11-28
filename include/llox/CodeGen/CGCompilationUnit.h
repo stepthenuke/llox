@@ -2,6 +2,7 @@
 #define LLOX_CODEGEN_CGCOMPILATIONUNIT_H
 
 #include "llox/AST/AST.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 
@@ -15,6 +16,7 @@ class CGCompilationUnit {
 public:
    llvm::Type *VoidTy;
    llvm::Type *Int1Ty;
+   llvm::Type *Int32Ty;
    llvm::Type *DoubleTy;
 
 public:

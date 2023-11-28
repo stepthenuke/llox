@@ -24,10 +24,13 @@ class CGFunction {
 private:
    void setCurBlock(llvm::BasicBlock *BB);
 
-   void writeVariable(const Decl *D, llvm::Value *V);
-   llvm::Value *readVariable(const Decl *D);
+   void writeVariable(const ObjectExpr *D, llvm::Value *V);
+   llvm::Value *readVariable(const ObjectExpr *D);
 
+   llvm::Value *getDefVal(const Decl *D);
    llvm::AllocaInst *createEntryBlockAlloca(const Decl *D);
+   llvm::AllocaInst *createEntryBlockAlloca(llvm::Value *Val, StringRef Name);
+
    void writeLocalVariable(const Decl *D, llvm::Value *V);
    llvm::Value *readLocalVariable(const Decl *D);
 
@@ -35,15 +38,18 @@ private:
    llvm::FunctionType *createFunctionType(const FunctionDecl *FunD);
    llvm::Function *createFunction(const FunctionDecl *FunD, llvm::FunctionType *FTy);
 
+   bool isCompoundType(const Stmt* S);
+   llvm::Value *GEPObject(const ObjectExpr *O);
+
 private:
    void emit(const StmtList &Stmts);
+   void emit(const VariableDecl *Dec);
    void emit(const IfStmt *Stm);
    void emit(const WhileStmt* Stm);
    void emit(const ReturnStmt *Stm);
    void emit(const BlockStmt *Stm);
    void emit(const ExprStmt *Stm);
 
-   llvm::Value *emit(const Expr *Exp);
    llvm::Value *emit(const InfixExpr *Exp);
    llvm::Value *emit(const PrefixExpr *Exp);
    llvm::Value *emit(const FunctionCallExpr *Exp);
@@ -53,6 +59,8 @@ private:
 public:
    CGFunction(CGCompilationUnit &CGCUnit);
    llvm::Function *run(const FunctionDecl *FunD);
+   
+   llvm::Value *emit(const Expr *Exp);
 };
 
 } // namespace llox

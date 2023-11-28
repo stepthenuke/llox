@@ -20,12 +20,21 @@ llvm::Type *CGFunction::getLLVMType(const Stmt *Stm) {
    return nullptr;
 }
 
+bool CGFunction::isCompoundType(const Stmt* S) {
+   if (auto *P = dyn_cast<ParameterDecl>(S))
+      if (isa<ArrayTypeDecl>(P->getType()))
+         return true;
+   return false;
+}
+
 llvm::FunctionType *CGFunction::createFunctionType(const FunctionDecl *FunD) {
    llvm::Type *ReturnTy = getLLVMType(FunD->getRetType());
    auto Params = FunD->getParams();
    llvm::SmallVector<llvm::Type*, 8> ParamTypes;
    for (auto P : Params) {
-      ParamTypes.push_back(getLLVMType(P));
+      llvm::Type *LLVMType = getLLVMType(P);
+      LLVMType = (P->isVar() || isCompoundType(P)) ? LLVMType->getPointerTo() : LLVMType;
+      ParamTypes.push_back(LLVMType);
    }
    return llvm::FunctionType::get(ReturnTy, ParamTypes, false);
 }
@@ -42,40 +51,39 @@ llvm::Function *CGFunction::createFunction(const FunctionDecl *FunD, llvm::Funct
    for (auto I = Fn->arg_begin(), E = Fn->arg_end(); I != E; ++I, ++ParI) {
       if (auto *P = dyn_cast<ParameterDecl>(*ParI)) {
          I->setName(P->getName());
+         if (P->isVar() || isCompoundType(P)) {
+            llvm::AttrBuilder Attr {CGCUnit.getLLVMContext()};
+            llvm::TypeSize Sz = CGCUnit.getModule()->getDataLayout().getTypeStoreSize(
+               CGCUnit.convertType(P->getType())
+            );
+            Attr.addDereferenceableAttr(Sz);
+            Attr.addAttribute(llvm::Attribute::NoCapture);
+            I->addAttrs(Attr);
+         }
       }
    }
    return Fn;
 }
 
-void CGFunction::writeVariable(const Decl *D, llvm::Value *Val) {
+void CGFunction::writeVariable(const ObjectExpr *O, llvm::Value *Val) {
+   const Decl *D = O->getObjectDecl();
    if (auto *VarD = dyn_cast<VariableDecl>(D)) {
-      if (VarD->getEnclosingDecl() == CGCUnit.getCompilationUnitDecl())
-         Builder.CreateStore(Val, CGCUnit.getGlobal(D));
-      else 
-         writeLocalVariable(D, Val);
+        Builder.CreateStore(Val, GEPObject(O)); 
    }
    else if (auto *ParD = dyn_cast<ParameterDecl>(D)) {
-      if (ParD->getEnclosingDecl() == CGCUnit.getCompilationUnitDecl())
-         Builder.CreateStore(Val, CGCUnit.getGlobal(D));
-      else 
-         writeLocalVariable(D, Val);
+        Builder.CreateStore(Val, GEPObject(O)); 
    }
    else 
       llvm::report_fatal_error("unsupported declaration");
 }
 
-llvm::Value *CGFunction::readVariable(const Decl *D) {
+llvm::Value *CGFunction::readVariable(const ObjectExpr *O) {
+   const Decl *D = O->getObjectDecl();
    if (auto *VarD = dyn_cast<VariableDecl>(D)) {
-      if (VarD->getEnclosingDecl() == CGCUnit.getCompilationUnitDecl())
-         return Builder.CreateLoad(getLLVMType(D), CGCUnit.getGlobal(D));
-      else 
-         return readLocalVariable(D);
+         return Builder.CreateLoad(getLLVMType(O->getType()), GEPObject(O));
    }
    else if (auto *ParD = dyn_cast<ParameterDecl>(D)) {
-      if (ParD->getEnclosingDecl() == CGCUnit.getCompilationUnitDecl())
-         return Builder.CreateLoad(getLLVMType(D), CGCUnit.getGlobal(D));
-      else 
-         return readLocalVariable(D);
+         return Builder.CreateLoad(getLLVMType(O->getType()), GEPObject(O));
    }
    else 
       llvm::report_fatal_error("unsupported declaration");   
@@ -86,26 +94,33 @@ llvm::AllocaInst *CGFunction::createEntryBlockAlloca(const Decl *D) {
    return TmpBuilder.CreateAlloca(getLLVMType(D), nullptr, D->getName());
 }
 
-void CGFunction::writeLocalVariable(const Decl *D, llvm::Value *Val) {
-   auto Dec = Defs.find(D);
-   if (Dec == Defs.end()) {
-      auto *Alloca = createEntryBlockAlloca(D);
-      Defs[D] = Alloca;
-   }
-   Builder.CreateStore(Val, Defs[D]);
+llvm::AllocaInst *CGFunction::createEntryBlockAlloca(llvm::Value *Val, StringRef Name) {
+   llvm::IRBuilder<> TmpBuilder(&Fn->getEntryBlock(), Fn->getEntryBlock().begin());
+   return TmpBuilder.CreateAlloca(Val->getType(), nullptr, Name);
 }
 
-llvm::Value *CGFunction::readLocalVariable(const Decl *D) {
+llvm::Value *CGFunction::getDefVal(const Decl *D) {
    auto Dec = Defs.find(D);
    if (Dec == Defs.end())
       llvm::report_fatal_error("no declaration");
+   return Defs[D];
+}
 
-   return Builder.CreateLoad(getLLVMType(D), Defs[D]);
+void CGFunction::writeLocalVariable(const Decl *D, llvm::Value *Val) {
+   auto *Def = getDefVal(D);
+   Builder.CreateStore(Val, Def);
+}
+
+llvm::Value *CGFunction::readLocalVariable(const Decl *D) {
+   auto *Def = getDefVal(D);
+   return Builder.CreateLoad(getLLVMType(D), Def);
 }
 
 void CGFunction::emit(const StmtList &Stmts) {
    for (auto &&Stm : Stmts) {
-      if (auto *S = dyn_cast<IfStmt>(Stm))
+      if (auto *D = dyn_cast<VariableDecl>(Stm))
+         emit(D);
+      else if (auto *S = dyn_cast<IfStmt>(Stm))
          emit(S);
       else if (auto *S = dyn_cast<WhileStmt>(Stm))
          emit(S);
@@ -114,6 +129,11 @@ void CGFunction::emit(const StmtList &Stmts) {
       else if (auto *S = dyn_cast<ExprStmt>(Stm))
          emit(S);
    }
+}
+
+void CGFunction::emit(const VariableDecl *D) {
+   auto *Alloca = createEntryBlockAlloca(D);
+   Defs[D] = Alloca;
 }
 
 void CGFunction::emit(const IfStmt *Stm) {
@@ -183,6 +203,8 @@ llvm::Value *CGFunction::emit(const Expr *Exp) {
       return llvm::ConstantFP::get(CGCUnit.DoubleTy, E->getValue());
    else if (auto *E = dyn_cast<BoolLiteral>(Exp))
       return llvm::ConstantInt::get(CGCUnit.Int1Ty, E->getValue());
+   else if (auto *E = dyn_cast<IntLiteral>(Exp))
+      return llvm::ConstantInt::get(CGCUnit.Int32Ty, E->getValue());
    else if (auto *E = dyn_cast<InfixExpr>(Exp))
       return emit(E);
    else if (auto *E = dyn_cast<PrefixExpr>(Exp))
@@ -273,12 +295,47 @@ llvm::Value *CGFunction::emit(const FunctionCallExpr *Exp) {
 }
 
 llvm::Value *CGFunction::emit(const ObjectExpr *Exp) {
-   return readVariable(Exp->getObjectDecl());
+   return readVariable(Exp);
+}
+
+llvm::Value *CGFunction::GEPObject(const ObjectExpr *O) {
+   auto *ObjDecl = O->getObjectDecl();
+   llvm::Value *Def = nullptr;
+   if (ObjDecl->getEnclosingDecl() == CGCUnit.getCompilationUnitDecl())
+      Def = CGCUnit.getGlobal(ObjDecl);
+   else 
+      Def = getDefVal(ObjDecl);
+   
+   if (auto *P = dyn_cast<ParameterDecl>(ObjDecl)) {
+      if (P->isVar() || isCompoundType(P))
+         Def = Builder.CreateLoad(getLLVMType(ObjDecl)->getPointerTo(), getDefVal(ObjDecl));
+   }
+   auto Selectors = O->getSelectors();
+   if (Selectors.empty())
+      return Def;
+
+   llvm::SmallVector<llvm::Value*, 8> Indeces;
+   Indeces.push_back(llvm::ConstantInt::get(CGCUnit.Int32Ty, 0));
+   for (auto *Sel : Selectors) {
+      if (auto *IdxSel = llvm::dyn_cast<IndexSelector>(Sel)) {
+         Indeces.push_back(emit(IdxSel->getIndex()));
+      }
+      else if (auto *FieldSel = llvm::dyn_cast<FieldSelector>(Sel)) {
+         llvm::Value *V = llvm::ConstantInt::get(CGCUnit.Int32Ty, FieldSel->getIndex());
+         Indeces.push_back(V);
+      }
+      else 
+         llvm::report_fatal_error("bad selector");
+   } 
+   if (!Indeces.empty()) {
+      Def = Builder.CreateInBoundsGEP(getLLVMType(ObjDecl), Def, Indeces);  
+   }
+   return Def;
 }
 
 llvm::Value *CGFunction::emit(const AssignmentExpr *Exp) {
-   llvm::Value *Val = emit(Exp->getExpr());
-   writeVariable(Exp->getObject()->getObjectDecl(), Val);
+   llvm::Value *Val = emit(Exp->getExpr()); 
+   writeVariable(Exp->getObject(), Val);
    return Val;
 }
 
@@ -296,9 +353,15 @@ llvm::Function *CGFunction::run(const FunctionDecl *FunD) {
    auto Params = FunD->getParams();
    auto ParI = Params.begin();
    for (auto &Arg : Fn->args()) {
-      llvm::AllocaInst *Alloca = createEntryBlockAlloca(*ParI);
-      Builder.CreateStore(&Arg, Alloca);
-      Defs[*ParI] = Alloca;
+      if (auto *P = dyn_cast<ParameterDecl>(*ParI)) {
+         llvm::AllocaInst *Alloca = nullptr;
+         if (P->isVar() || isCompoundType(P))
+            Alloca = createEntryBlockAlloca(&Arg, P->getName());
+         else
+            Alloca = createEntryBlockAlloca(*ParI);
+         Builder.CreateStore(&Arg, Alloca);
+         Defs[*ParI] = Alloca;
+      }
       ++ParI;
    }
 

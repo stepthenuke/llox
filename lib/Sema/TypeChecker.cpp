@@ -32,10 +32,17 @@ bool TypeChecker::checkOperatorType(tok::TokenKind OpKind, TypeDecl *Ty) {
    return false;
 }
 
-TypeDecl *TypeChecker::getInfixTy(TypeDecl *Ty1, TypeDecl *Ty2) {
+bool TypeChecker::checkAssignmentTypes(TypeDecl *Ty1, TypeDecl *Ty2) {
+   if (Ty1 == Ty2)
+      return false;
+   
+   if (Ty1 == Sem->getDouble() && Ty2 == Sem->getInt())
+      return false;
 
-   llvm::outs() << "Type checker: " << Ty1->getName() << " " << Ty2->getName() << "\n";
-   llvm::outs() << Ty1 << " " << Ty2 << "   " << Sem->getDouble() <<  "\n";
+   return true;
+}
+
+TypeDecl *TypeChecker::getInfixTy(TypeDecl *Ty1, TypeDecl *Ty2) {
    if ((Ty1 == Sem->getInt() && Ty2 == Sem->getDouble()) || (Ty1 == Sem->getDouble() && Ty2 == Sem->getInt()))
       return Sem->getDouble();
 
@@ -46,7 +53,7 @@ TypeDecl *TypeChecker::getInfixTy(TypeDecl *Ty1, TypeDecl *Ty2) {
       return Ty1;
 
    if (Ty1 == Sem->getInt() && Ty1 == Ty2)
-      return Ty2;
+      return Ty1;
 
    return nullptr;
 }

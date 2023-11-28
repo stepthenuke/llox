@@ -16,6 +16,7 @@ public:
 
    bool checkOperatorType(tok::TokenKind OpKind, TypeDecl *Ty);
    TypeDecl *getInfixTy(TypeDecl *Ty1, TypeDecl *Ty2);
+   bool checkAssignmentTypes(TypeDecl *Ty1, TypeDecl *Ty2);
    bool checkFunctionRetTy(FunctionDecl *FunDecl, StmtList &FunStmts);
    void checkFunctionParameterTypes(const ParameterList &Params, const ExprList &Exprs);
 };

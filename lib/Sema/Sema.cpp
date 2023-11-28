@@ -135,17 +135,18 @@ void Sema::actOnFunctionBlock(StmtList &Decls, FunctionDecl *FunDecl, StmtList &
    Decls.push_back(FunDecl);
 }
 
-void Sema::actOnFunctionParameters(ParameterList &Params, IdentList &ParIds, StmtList &ParTypes) {
+void Sema::actOnFunctionParameters(ParameterList &Params, IdentList &ParIds, StmtList &ParTypes, llvm::SmallVector<bool, 8> &VarFlags) {
    if (!CurScope)
       llvm_unreachable("current scope isn't set");
    assert(ParIds.size() == ParTypes.size());
 
    auto TypeIdx = ParTypes.begin();
-   for (auto Idx = ParIds.begin(), E = ParIds.end(); Idx != E; ++Idx, ++TypeIdx) {
+   auto VarIdx = VarFlags.begin();
+   for (auto Idx = ParIds.begin(), E = ParIds.end(); Idx != E; ++Idx, ++TypeIdx, ++VarIdx) {
       if (auto *Ty = dyn_cast<TypeDecl>(*TypeIdx)) {
          SMLoc Loc = Idx->first;
          StringRef Name = Idx->second;
-         ParameterDecl *ParDecl = new ParameterDecl(CurDecl, Loc, Name, Ty, true);
+         ParameterDecl *ParDecl = new ParameterDecl(CurDecl, Loc, Name, Ty, *VarIdx);
          if (CurScope->insert(ParDecl)) {
             Params.push_back(ParDecl);
          }
@@ -222,7 +223,7 @@ Expr *Sema::actOnAssignmentExpr(Expr *Left, Expr *Right) {
 
 void *Sema::actOnAssignmentInit(StmtList &Decls, Expr *E) {
    if (auto *V = dyn_cast<VariableDecl>(Decls.back())) {
-      if (V->getType() != E->getType())
+      if (TyChecker.checkAssignmentTypes(V->getType(), E->getType()))
          llvm_unreachable("incompatible types for assignment");
       AssignmentExpr *AssignExpr = new AssignmentExpr(V, E);
       actOnExprStmt(Decls, AssignExpr);
@@ -289,6 +290,8 @@ TypeDecl *Sema::actOnFieldSelector(Stmt *O, SelectorList &SelList, StringRef Nam
       if (isa<StructTypeDecl>(FieldTy) || isa<ArrayTypeDecl>(FieldTy))
          return FieldTy;
    }
+   else 
+      llvm_unreachable("field selector can't be used on non-struct");
    return nullptr;
 }
 
@@ -299,6 +302,8 @@ TypeDecl *Sema::actOnIndexSelector(Stmt *O, SelectorList &SelList, Expr *IdxE) {
       if (isa<StructTypeDecl>(BaseTy) || isa<ArrayTypeDecl>(BaseTy))
          return BaseTy;
    }
+   else
+      llvm_unreachable("index selector can't be used on non-array");
    return nullptr;
 }
 

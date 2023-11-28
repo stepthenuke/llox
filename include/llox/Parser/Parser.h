@@ -39,7 +39,7 @@ public:
    bool parseField(StmtList &Decls);
    bool parseTypeIdent(Decl *&D);
    bool parseStructDecl(StmtList &Decls);
-   bool parseFunctionParameter(IdentList &ParIds, StmtList &ParTypes);
+   bool parseFunctionParameter(IdentList &ParIds, StmtList &ParTypes, llvm::SmallVector<bool, 8> &VarFlags);
    bool parseFunctionParameterList(ParameterList &Params);
    bool parseBlock(StmtList &Decls, StmtList &Stmts);
    bool parseFunctionDecl(StmtList &Decls);

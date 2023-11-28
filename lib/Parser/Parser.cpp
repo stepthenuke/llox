@@ -308,7 +308,7 @@ bool Parser::parseTypeIdent(Decl *&D) {
    return false;
 }
 
-bool Parser::parseFunctionParameter(IdentList &ParIds, StmtList &ParTypes) {
+bool Parser::parseFunctionParameter(IdentList &ParIds, StmtList &ParTypes, llvm::SmallVector<bool, 8> &VarFlags) {
    if (CurTok.isNot(tok::identifier))
       return true;
    ParIds.emplace_back(CurTok.getLocation(), CurTok.getIdentifier());
@@ -316,6 +316,11 @@ bool Parser::parseFunctionParameter(IdentList &ParIds, StmtList &ParTypes) {
 
    if (consumeToken(tok::colon))
       return true;
+
+   if (consumeToken(tok::kw_var))
+      VarFlags.push_back(false);
+   else
+      VarFlags.push_back(true);
 
    Decl *D;
    if (parseTypeIdent(D))
@@ -336,18 +341,19 @@ bool Parser::parseFunctionParameterList(ParameterList &Params) {
    
    IdentList ParIds;
    StmtList ParTypes;
-   if (parseFunctionParameter(ParIds, ParTypes))
+   llvm::SmallVector<bool, 8> VarFlags;
+   if (parseFunctionParameter(ParIds, ParTypes, VarFlags))
       return true;
    while (CurTok.is(tok::comma)) {
       nextToken(); // eat comma
-      if (parseFunctionParameter(ParIds, ParTypes))
+      if (parseFunctionParameter(ParIds, ParTypes, VarFlags))
          return true;
    }
 
    if (consumeToken(tok::r_paren))
       return true;
 
-   Sem.actOnFunctionParameters(Params, ParIds, ParTypes);
+   Sem.actOnFunctionParameters(Params, ParIds, ParTypes, VarFlags);
    return false;
 }
 

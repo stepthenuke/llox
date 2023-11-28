@@ -1,7 +1,32 @@
 struct Point {
-   var p: double[3];
+   var x: double;
+   var y: double;
 };
 
-fun foo(a: double, b: double) : double {
-   return 10;
+
+var g: Point;
+fun gfoo() : double {
+   g.x = 2.;
+   g.y = 3.;
+   return g.y;
+}
+
+fun foo(a: var double[3]) : double {
+   a[0] = 0.;
+   return a[2];
+}
+
+fun foo1(a: double[3]) : double {
+   a[0] = 0.;
+   return a[2];
+}
+
+fun soo(a: Point) : double {
+   a.x = 2.;
+   return a.y;
+}
+
+fun soo1(a: var Point) : double {
+   a.x = 2.;
+   return a.y;
 }

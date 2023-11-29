@@ -12,7 +12,7 @@ std::unique_ptr<llvm::Module> CodeGenerator::run(CompilationUnitDecl *CU, std::s
    M->setDataLayout(TM->createDataLayout());
    CGCompilationUnit CGCompUnit(M.get());
    CGCompUnit.run(CU);
-   M->print(llvm::errs(), nullptr);
+   // M->print(llvm::errs(), nullptr);
    return M;
 }
 

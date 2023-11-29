@@ -310,6 +310,9 @@ llvm::Value *CGFunction::createIntOp(llvm::Value *Left, llvm::Value *Right, tok:
    case tok::greater_equal:
       return Builder.CreateICmpSGE(Left, Right);
       break;
+   case tok::percent:
+      return Builder.CreateSRem(Left, Right);
+      break;
    default:
       llvm_unreachable("wrong operator");
    }

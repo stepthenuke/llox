@@ -20,6 +20,7 @@ BINARY_OPERATOR(less_equal, "<=", Prec_Comparison)
 
 BINARY_OPERATOR(plus, "+", Prec_Term)
 BINARY_OPERATOR(minus, "-", Prec_Term)
+BINARY_OPERATOR(percent, "%", Prec_Term)
 
 BINARY_OPERATOR(star, "*", Prec_Factor)
 BINARY_OPERATOR(slash, "/", Prec_Factor)

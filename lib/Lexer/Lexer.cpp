@@ -15,7 +15,6 @@ void KeywordFilter::addKeywords() {
 }
 
 tok::TokenKind KeywordFilter::getKeyword(StringRef Name, tok::TokenKind TokenIfNotFound = tok::unknown) {
-   // llvm::outs() << "kw: " << Name.str() << std::endl;
    auto Res = Table.find(Name);
    if (Res != Table.end())
       return Res->second;
@@ -38,7 +37,6 @@ void Lexer::getNextToken(Token &Tok) {
    // if we came to end -> it's eof
    if (!*BufPtr) {
       Tok.setKind(tok::eof);
-      // llvm::outs() << ": eof\n";
       return;
    }
 

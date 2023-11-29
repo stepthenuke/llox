@@ -33,6 +33,7 @@ PUNCTUATOR(semicolon, ";")
 PUNCTUATOR(star, "*")
 PUNCTUATOR(hash, "#")
 PUNCTUATOR(single_quote, "'")
+PUNCTUATOR(percent, "%")
 
 AMBIG_PUNCTUATOR(double_quote, "\"")
 AMBIG_PUNCTUATOR(slash, "/")

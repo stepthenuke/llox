@@ -286,7 +286,6 @@ TypeDecl *Sema::actOnFieldSelector(Stmt *O, SelectorList &SelList, StringRef Nam
       TypeDecl *FieldTy = StructTy->getFieldType(Name);
       SelList.push_back(new FieldSelector(Idx, Name, FieldTy));
 
-      print(FieldTy);
       if (isa<StructTypeDecl>(FieldTy) || isa<ArrayTypeDecl>(FieldTy))
          return FieldTy;
    }

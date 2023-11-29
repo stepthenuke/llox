@@ -1,6 +1,8 @@
 #ifndef LLOX_BASIC_TOKENKINDS_H
 #define LLOX_BASIC_TOKENKINDS_H
 
+#include "llvm/Support/Compiler.h"
+
 namespace llox {
 namespace tok {
 
@@ -37,15 +39,15 @@ enum OperatorPrec {
 OperatorPrec getUnaryPrec(tok::TokenKind K);
 OperatorPrec getBinaryPrec(tok::TokenKind K);
 
-inline bool isUnaryOp(tok::TokenKind K) {
+LLVM_READNONE inline bool isUnaryOp(tok::TokenKind K) {
    return getUnaryPrec(K) != Prec_None;
 }
 
-inline bool isBinaryOp(tok::TokenKind K) {
+LLVM_READNONE inline bool isBinaryOp(tok::TokenKind K) {
    return getBinaryPrec(K) != Prec_None;
 }
 
-inline bool isLogicalBinOp(tok::TokenKind K) {
+LLVM_READNONE inline bool isLogicalBinOp(tok::TokenKind K) {
    return getBinaryPrec(K) == Prec_Equality || getBinaryPrec(K) == Prec_Comparison;
 }
 
@@ -53,31 +55,31 @@ inline bool isLogicalBinOp(tok::TokenKind K) {
 
 namespace charinfo {
 
-inline bool isASCII(char C) {
+LLVM_READNONE inline bool isASCII(char C) {
    return static_cast<unsigned char>(C) <= 127;
 }
 
-inline bool isDigit(char C) {
+LLVM_READNONE inline bool isDigit(char C) {
    return isASCII(C) && ('0' <= C && C <= '9');
 }
 
-inline bool isAlpha(char C) {
+LLVM_READNONE inline bool isAlpha(char C) {
    return isASCII(C) && (('a' <= C && C <= 'z') || ('A' <= C && C <= 'Z') || C == '_');
 }
 
-inline bool isAlphanumeric(char C) {
+LLVM_READNONE inline bool isAlphanumeric(char C) {
    return isAlpha(C) || isDigit(C);
 }
 
-inline bool isVerticalWhitespace(char C) {
+LLVM_READNONE inline bool isVerticalWhitespace(char C) {
    return isASCII(C) && (C == '\n' || C == '\r');
 }
 
-inline bool isHorizontalWhitespace(char C) {
+LLVM_READNONE inline bool isHorizontalWhitespace(char C) {
    return isASCII(C) && ( C == ' ' || C == '\t');
 }
 
-inline bool isWhitespace(char C) {
+LLVM_READNONE inline bool isWhitespace(char C) {
    return isVerticalWhitespace(C) || isHorizontalWhitespace(C);
 }
 

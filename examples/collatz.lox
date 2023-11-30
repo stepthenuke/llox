@@ -1,0 +1,24 @@
+fun read_int(): int;
+fun print_int(v: int): nil;
+
+fun collatz(n: int) : nil {
+   var i: int = 0;
+   while (n != 1) {
+      if (n % 2 == 1) {
+         n = 3 * n + 1;
+      }
+      else {
+         n = n / 2;
+      }
+      i = i + 1;
+      if (i == 20) {
+         print_int(n);
+         i = 0;
+      }
+   }
+}
+
+fun main(): int {
+   collatz(1000000);
+   return 0;
+}

@@ -73,8 +73,11 @@ That's not suprising as we're doing O2 optimization passes.
 ### Usage:
 
 ```
-./llox file.lox (here we get -> .s file)
+./llox file.lox (here we get .s file)
 clang file.s path_to_llox_repo/examples/llib/llib.c 
+---------------------------------------------------
+./llox --emit-ast file.lox (for emitting ast)
+./llox --emit-llvm file.lox (for emitting IR)
 ```
 
 ## Build

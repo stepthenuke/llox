@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <math.h>
 
 int read_int() {
    int res;

@@ -379,14 +379,10 @@ llvm::Value *CGFunction::emit(const FunctionCallExpr *Exp) {
    for (auto &&A : ArgExprList)
       Args.push_back(emit(A));
 
-   llvm::outs() << "HERE1\n";
 
    const Decl *CalleeD = Exp->getFunctionDecl();
-   llvm::outs() << "HERE2\n";
    llvm::GlobalObject *CalleeGO = CGCUnit.getGlobal(CalleeD);
-   llvm::outs() << "HERE3\n";
    auto *Callee = cast_or_null<llvm::Function>(CalleeGO);
-   llvm::outs() << "HERE4\n";
    return Builder.CreateCall(Callee, Args);
 }
 

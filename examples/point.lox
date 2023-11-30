@@ -1,0 +1,26 @@
+fun print_double(v: double) : nil;
+fun sqrt(v: double) : double;
+
+struct Point {
+   var x: double;
+   var y: double;
+};
+
+fun get_distance(p1: Point, p2: Point): double {
+   var dx: double = p1.x - p2.x;
+   var dy: double = p1.y - p2.y;
+   return sqrt(dx*dx + dy*dy);
+}
+
+fun main() : int {
+   var origin: Point;
+   origin.x = 0;
+   origin.y = 0;
+
+   var p: Point;
+   p.x = 20;
+   p.y = 20;
+
+   print_double(get_distance(origin, p));
+   return 0;
+}

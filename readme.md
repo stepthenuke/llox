@@ -1,5 +1,23 @@
 ## llox = LLVM + lox
-Lox language is a language from Crafting Interpreters however this is it's modification (we have no classes and mb smth more). Now it's static language.
+Lox language is a language from Crafting Interpreters however this is it's modification (we have no classes and mb smth more). Now it's static language and there are no classes but I added structs and arrays. 
+
+What we have:
+```
+var arr: int[3]; // fixed size arrays
+
+// structs
+struct Vector {
+   var x: double;
+   var y: double;
+}
+
+// argument pass by copy and by reference
+fun foo(x: double, y: var double) {}
+
+// array always is passed to function by ref, next function declarations are identical
+fun foo_arr1(A: int[3]) {}
+fun foo_arr2(A: var int[3]) {}
+```
 
 ### Examples:
 ```

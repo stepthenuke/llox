@@ -427,9 +427,7 @@ bool Parser::parseSelector(TypeDecl *Ty, SelectorList &SelList, TypeDecl *&RetTy
       if (!CurTok.is(tok::identifier))
          return true;
       RetTy = Sem.actOnFieldSelector(Ty, SelList, CurTok.getIdentifier());
-      llvm::outs() << "FIELD\n";
       nextToken();
-      llvm::outs() << "HERE\n";
    }
    else if (CurTok.is(tok::l_bracket)) {
       nextToken();

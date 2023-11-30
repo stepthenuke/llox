@@ -178,12 +178,8 @@ int main(int argc_, char **argv_) {
          llvm::LLVMContext Context;
          if (CodeGenerator *CG = CodeGenerator::create(Context, TM)) {
             std::unique_ptr<llvm::Module> M = CG->run(CompUnit, F);
-            M->print(errs(), nullptr);
-            llvm::errs() << "--------------------------------------------\n";
-            llvm::errs() << "--------------------------------------------\n";
             if (!emit(argv_[0], M.get(), TM, F))
                llvm::WithColor::error(errs(), argv_[0]) << "Error emitting\n"; 
-            M->print(errs(), nullptr);
             delete CG;
          }
       }

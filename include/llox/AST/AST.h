@@ -291,6 +291,7 @@ class FunctionDecl : public Decl {
    ParameterList Params;
    TypeDecl *RetType;
    StmtList Stmts;
+   bool IsDef = false;
 
 public:
    FunctionDecl(Stmt *EnclosingDecl, SMLoc Loc, StringRef Name)
@@ -320,6 +321,13 @@ public:
    }
    void setStmts(StmtList &SL) {
       Stmts = SL;
+   }
+
+   bool isDef() const {
+      return IsDef;
+   }
+   void setIsDef(bool Flag) {
+      IsDef = Flag;
    }
 
 public:

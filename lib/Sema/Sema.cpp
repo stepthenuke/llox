@@ -193,7 +193,7 @@ bool Sema::actOnVariableDecl(StmtList &Decls, Identifier Id, Decl *D) {
 }
 
 Expr *Sema::actOnIntLiteral(SMLoc Loc, StringRef Literal) {
-   llvm::APInt Value(64, Literal, 10);
+   llvm::APInt Value(32, Literal, 10);
    return new IntLiteral(Loc, llvm::APSInt(Value, false), IntType);
 }
 

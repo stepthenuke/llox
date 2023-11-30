@@ -54,6 +54,9 @@ TypeDecl *TypeChecker::getInfixTy(TypeDecl *Ty1, TypeDecl *Ty2) {
    if (Ty1 == Sem->getInt() && Ty1 == Ty2)
       return Ty1;
 
+   if (isa<StructTypeDecl>(Ty1) && isa<StructTypeDecl>(Ty2) && Ty1 == Ty2)
+      return Ty1;   
+
    return nullptr;
 }
 

@@ -35,6 +35,7 @@ static codegen::RegisterCodeGenFlags CGF;
 
 static llvm::cl::list<std::string> InputFiles(cl::Positional, cl::desc("<input-files>"));
 static llvm::cl::opt<bool> EmitLLVM("emit-llvm", cl::desc("Emit IR code"), cl::init(false));
+static llvm::cl::opt<bool> EmitAST("emit-ast", cl::desc("Emit AST"), cl::init(false));
 
 static const char *Head = "Compiler for (not) llox by lox";
 
@@ -170,7 +171,8 @@ int main(int argc_, char **argv_) {
       auto Sem = Sema();
       auto Par = Parser(Lex, Sem);
       CompilationUnitDecl *CompUnit = Par.parse();
-      print(CompUnit); // TODO: remove
+      if (EmitAST)
+         print(CompUnit);
 
       if (CompUnit) {
          llvm::LLVMContext Context;

@@ -387,7 +387,11 @@ bool Parser::parseFunctionDecl(StmtList &Decls) {
    Sem.actOnFunctionParamList(FunDecl, FunParams, RetTy);
 
    StmtList FunStmts;
-   if (parseBracedStmts(FunStmts))
+   if (CurTok.is(tok::semicolon)) {
+      nextToken();
+      FunDecl->setIsDef(true);
+   }
+   else if (parseBracedStmts(FunStmts))
       return true;
    
    Sem.actOnFunctionBlock(Decls, FunDecl, FunStmts);
@@ -423,7 +427,9 @@ bool Parser::parseSelector(TypeDecl *Ty, SelectorList &SelList, TypeDecl *&RetTy
       if (!CurTok.is(tok::identifier))
          return true;
       RetTy = Sem.actOnFieldSelector(Ty, SelList, CurTok.getIdentifier());
+      llvm::outs() << "FIELD\n";
       nextToken();
+      llvm::outs() << "HERE\n";
    }
    else if (CurTok.is(tok::l_bracket)) {
       nextToken();
@@ -448,13 +454,13 @@ bool Parser::parseSelectorList(Expr *O) {
       if (parseSelector(ObjE->getType(), SL, RetTy))
          return true;
    }
-
    while (RetTy) {
       if (parseSelector(RetTy, SL, RetTy))
          return true;
    }
 
    Sem.actOnSelectorList(O, SL);
+   return false;
 }
 
 bool Parser::parseIdentifierExpr(Expr *&E) {
@@ -472,7 +478,6 @@ bool Parser::parseIdentifierExpr(Expr *&E) {
       return false;
    }
    nextToken();
-
 
    ExprList ParamExprs;
    if (parseExprList(ParamExprs))

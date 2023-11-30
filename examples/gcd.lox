@@ -1,0 +1,18 @@
+fun read_int(): int;
+fun print_int(v: int): nil;
+
+fun gcd(a: int, b: int) : int {
+   var temp: int;
+   while ((a % b) > 0) {
+      temp = a % b;
+      a = b;
+      b = temp;
+   }
+   return b;
+}
+
+fun main(): int {
+   var n: int = read_int();
+   print_int(gcd(228, n));
+   return 0;
+}

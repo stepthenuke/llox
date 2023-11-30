@@ -1,0 +1,14 @@
+fun main() : int {
+   var a: double = 3. / 2.;
+
+   var I: int = -10 / 2;
+
+   if (223.0 or false) {
+      return I;
+   }
+   
+   if (false or true) {
+      return 1;
+   }
+   return 0;
+}

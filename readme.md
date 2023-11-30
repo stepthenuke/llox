@@ -1,16 +1,34 @@
 ## llox = LLVM + lox
-Lox lang is a lang from Crafting Interpreters however this is
+Lox language is a language from Crafting Interpreters however this is it's modification (we have no classes and mb smth more). Now it's static language.
 
-## TODO:
+### Examples:
+```
+fun read_int(): int;
+fun print_int(v: int): nil;
 
-1. Lexer - minimal done
-2. Parser - minimal done
-3. Sema - for exprs, decls
-4. AST Printer - crutchy but enough
-5. Error Printer - after basic codegen ready
-6. Translate language to IR - basic
----------------------------------------------
-7. Passes, ... 
+fun gcd(a: int, b: int) : int {
+   var temp: int;
+   while ((a % b) > 0) {
+      temp = a % b;
+      a = b;
+      b = temp;
+   }
+   return b;
+}
+
+fun main(): int {
+   var n: int = read_int();
+   print_int(gcd(228, n));
+   return 0;
+}
+```
+
+### Usage:
+
+```
+./llox file.lox (here we get -> .s file)
+clang file.s path_to_llox_repo/examples/llib/llib.c 
+```
 
 ## Build
 ```
@@ -22,77 +40,3 @@ cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_DIR=../folder_with_llvm_build/lib/cmake/
 make
 make install
 ```
-
-I want to make it static -> we need to change grammar a bit. Add something like:
-```
-var a: int = 5;
-fun foo(a: int, b: int) : int {
-   return a + b;
-}
-
-var arr: int[5]; // we'll also add static arrays
-```
-
-Grammar from original language:
-```
-program        → declaration* EOF ;
-
-declaration    → classDecl
-               | funDecl
-               | varDecl
-               | statement ;
-
-classDecl      → "class" IDENTIFIER ( "<" IDENTIFIER )?
-                 "{" function* "}" ;
-funDecl        → "fun" function ;
-varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
-
-statement      → exprStmt
-               | forStmt
-               | ifStmt
-               | printStmt
-               | returnStmt
-               | whileStmt
-               | block ;
-
-exprStmt       → expression ";" ;
-forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
-                           expression? ";"
-                           expression? ")" statement ;
-ifStmt         → "if" "(" expression ")" statement
-                 ( "else" statement )? ;
-printStmt      → "print" expression ";" ;
-returnStmt     → "return" expression? ";" ;
-whileStmt      → "while" "(" expression ")" statement ;
-block          → "{" declaration* "}" ;
-
-unary          → ( "!" | "-" ) unary | call ;
-call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
-primary        → "true" | "false" | "nil" | "this"
-               | NUMBER | STRING | IDENTIFIER | "(" expression ")"
-               | "super" "." IDENTIFIER ;
-
-function       → IDENTIFIER "(" parameters? ")" : type block ;
-parameters     → IDENTIFIER : type ( "," IDENTIFIER : type )* ;
-arguments      → expression ( "," expression )* ;
-
-expression     → assignment ;
-
-assignment     → ( call "." )? IDENTIFIER "=" assignment
-               | logic_or ;
-
-logic_or       → logic_and ( "or" logic_and )* ;
-logic_and      → equality ( "and" equality )* ;
-equality       → comparison ( ( "!=" | "==" ) comparison )* ;
-comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
-term           → factor ( ( "-" | "+" ) factor )* ;
-factor         → unary ( ( "/" | "*" ) unary )* ;
-
-
-NUMBER         → DIGIT+ ( "." DIGIT+ )? ;
-STRING         → "\"" <any char except "\"">* "\"" ;
-IDENTIFIER     → ALPHA ( ALPHA | DIGIT )* ;
-ALPHA          → "a" ... "z" | "A" ... "Z" | "_" ;
-DIGIT          → "0" ... "9" ;
-```
-

@@ -8,16 +8,17 @@ void CGFunction::setCurBlock(llvm::BasicBlock *BB) {
 }
 
 llvm::Type *CGFunction::getLLVMType(const Stmt *Stm) {
-   if (auto *VarD = dyn_cast<VariableDecl>(Stm)) {
+   if (auto *VarD = dyn_cast_or_null<VariableDecl>(Stm)) {
       return CGCUnit.convertType(VarD->getType());
    }
-   else if (auto *ParD = dyn_cast<ParameterDecl>(Stm)) {
+   else if (auto *ParD = dyn_cast_or_null<ParameterDecl>(Stm)) {
       return CGCUnit.convertType(ParD->getType());
    }
-   else if (auto *TypD = dyn_cast<TypeDecl>(Stm)) {
+   else if (auto *TypD = dyn_cast_or_null<TypeDecl>(Stm)) {
       return CGCUnit.convertType(TypD);
    }
-   return nullptr;
+
+   return CGCUnit.VoidTy;
 }
 
 bool CGFunction::isCompoundType(const Stmt* S) {
@@ -183,6 +184,7 @@ void CGFunction::emit(const WhileStmt* Stm) {
 void CGFunction::emit(const ReturnStmt *Stm) {
    if (Stm->getRetVal()) {
       llvm::Value *RetVal = emit(Stm->getRetVal());
+      castValue(RetVal, Fn->getReturnType());
       Builder.CreateRet(RetVal);
    }
    else
@@ -206,7 +208,7 @@ llvm::Value *CGFunction::emit(const Expr *Exp) {
    else if (auto *E = dyn_cast<BoolLiteral>(Exp))
       return llvm::ConstantInt::get(CGCUnit.Int1Ty, E->getValue());
    else if (auto *E = dyn_cast<IntLiteral>(Exp)) {
-      return llvm::ConstantInt::get(CGCUnit.Int64Ty, E->getValue());
+      return llvm::ConstantInt::get(CGCUnit.Int32Ty, E->getValue());
    }
    else if (auto *E = dyn_cast<InfixExpr>(Exp))
       return emit(E);
@@ -225,13 +227,13 @@ void CGFunction::castValue(llvm::Value *&Val, llvm::Type *DestTy) {
    if (Val->getType() == DestTy)
       return;
 
-   if (Val->getType() == CGCUnit.Int64Ty && DestTy == CGCUnit.DoubleTy) {
+   if (Val->getType() == CGCUnit.Int32Ty && DestTy == CGCUnit.DoubleTy) {
       Val = Builder.CreateCast(llvm::Instruction::SIToFP, Val, DestTy);
       return;
    }
 
-   if (Val->getType() == CGCUnit.Int64Ty && DestTy == CGCUnit.Int1Ty) {
-      Val = Builder.CreateICmpNE(Val, llvm::ConstantInt::get(CGCUnit.Int64Ty, 0, true));
+   if (Val->getType() == CGCUnit.Int32Ty && DestTy == CGCUnit.Int1Ty) {
+      Val = Builder.CreateICmpNE(Val, llvm::ConstantInt::get(CGCUnit.Int32Ty, 0, true));
       return;
    }
    
@@ -344,7 +346,7 @@ llvm::Value *CGFunction::emit(const InfixExpr *Exp) {
 
    if (ResultTy == CGCUnit.DoubleTy)
       Result = createDoubleOp(Left, Right, OpKind);
-   else if (ResultTy == CGCUnit.Int64Ty)
+   else if (ResultTy == CGCUnit.Int32Ty)
       Result = createIntOp(Left, Right, OpKind);
    else if (ResultTy == CGCUnit.Int1Ty)
       Result = createBoolOp(Left, Right, OpKind);
@@ -358,7 +360,7 @@ llvm::Value *CGFunction::emit(const PrefixExpr *Exp) {
    case tok::minus:
       if (Result->getType() == CGCUnit.DoubleTy)
          Result = Builder.CreateFNeg(Result);
-      else if (Result->getType() == CGCUnit.Int64Ty)
+      else if (Result->getType() == CGCUnit.Int32Ty)
          Result = Builder.CreateNSWNeg(Result);
       break;
    case tok::bang:
@@ -377,9 +379,14 @@ llvm::Value *CGFunction::emit(const FunctionCallExpr *Exp) {
    for (auto &&A : ArgExprList)
       Args.push_back(emit(A));
 
+   llvm::outs() << "HERE1\n";
+
    const Decl *CalleeD = Exp->getFunctionDecl();
+   llvm::outs() << "HERE2\n";
    llvm::GlobalObject *CalleeGO = CGCUnit.getGlobal(CalleeD);
-   auto *Callee = cast<llvm::Function>(CalleeGO);
+   llvm::outs() << "HERE3\n";
+   auto *Callee = cast_or_null<llvm::Function>(CalleeGO);
+   llvm::outs() << "HERE4\n";
    return Builder.CreateCall(Callee, Args);
 }
 
@@ -404,13 +411,13 @@ llvm::Value *CGFunction::GEPObject(const ObjectExpr *O) {
       return Def;
 
    llvm::SmallVector<llvm::Value*, 8> Indeces;
-   Indeces.push_back(llvm::ConstantInt::get(CGCUnit.Int64Ty, 0));
+   Indeces.push_back(llvm::ConstantInt::get(CGCUnit.Int32Ty, 0));
    for (auto *Sel : Selectors) {
       if (auto *IdxSel = llvm::dyn_cast<IndexSelector>(Sel)) {
          Indeces.push_back(emit(IdxSel->getIndex()));
       }
       else if (auto *FieldSel = llvm::dyn_cast<FieldSelector>(Sel)) {
-         llvm::Value *V = llvm::ConstantInt::get(CGCUnit.Int64Ty, FieldSel->getIndex());
+         llvm::Value *V = llvm::ConstantInt::get(CGCUnit.Int32Ty, FieldSel->getIndex());
          Indeces.push_back(V);
       }
       else 
@@ -436,6 +443,9 @@ llvm::Function *CGFunction::run(const FunctionDecl *FunD) {
    this->FunD = FunD;
    FnTy = createFunctionType(FunD);
    Fn = createFunction(FunD, FnTy);
+
+   if (FunD->isDef())
+      return Fn;
 
    llvm::BasicBlock *BB = llvm::BasicBlock::Create(CGCUnit.getLLVMContext(), "entry", Fn);
    setCurBlock(BB);

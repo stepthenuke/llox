@@ -3,7 +3,6 @@ struct Point {
    var y: double;
 };
 
-
 var g: Point;
 fun gfoo() : double {
    g.x = 2.;
@@ -28,5 +27,9 @@ fun soo(a: Point) : double {
 
 fun soo1(a: var Point) : double {
    a.x = 2.;
-   return a.y;
+   return 0;
+}
+
+fun test() : double {
+   return 1;
 }

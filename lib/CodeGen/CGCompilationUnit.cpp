@@ -10,7 +10,7 @@ CGCompilationUnit::CGCompilationUnit(llvm::Module *M)
 {
    VoidTy = llvm::Type::getVoidTy(getLLVMContext());
    Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
-   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
+   Int32Ty = llvm::Type::getInt32Ty(getLLVMContext());
    DoubleTy = llvm::Type::getDoubleTy(getLLVMContext());
 }
 
@@ -31,7 +31,7 @@ llvm::Type *CGCompilationUnit::convertType(const TypeDecl *Type) {
       if (Ty->getName() == "double")
          return DoubleTy;
       else if (Ty->getName() == "int")
-         return Int64Ty;
+         return Int32Ty;
       else if (Ty->getName() == "bool")   
          return Int1Ty;
    }
@@ -81,7 +81,7 @@ void CGCompilationUnit::run(const CompilationUnitDecl *CU) {
                StructFields.push_back(Ty);
             }
          }
-         llvm::StructType *StructTy = llvm::StructType::create(getLLVMContext(), StructFields, TypD->getName());
+         llvm::StructType::create(getLLVMContext(), StructFields, TypD->getName());
       }
    }
 }
